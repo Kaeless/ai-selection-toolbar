@@ -70,14 +70,21 @@ Windows 7 上的浏览器验收需要使用该系统可运行的对应版本。�
 ## 开发流程
 
 ```mermaid
-flowchart LR
-    A[需求基线] --> B[Windows 7 技术栈原型]
-    B --> C[跨程序划词与悬浮窗原型]
-    C --> D[AI 请求与结果面板]
-    D --> E[本地历史和 Markdown 笔记]
-    E --> F[设置与程序排除]
-    F --> G[安装版和免安装版打包]
-    G --> H[跨系统与跨程序验收]
+flowchart TB
+    A(["01 · 需求基线"]) --> B(["02 · Win7 兼容性验证"])
+    B --> C(["03 · 跨程序划词原型"])
+    C --> D(["04 · AI 请求与结果面板"])
+    D --> E(["05 · 历史与 Markdown 笔记"])
+    E --> F(["06 · 设置与程序排除"])
+    F --> G(["07 · 安装版与免安装版"])
+    G --> H(["08 · 跨系统和程序验收"])
+
+    classDef validate fill:#EAF3FF,stroke:#3B82F6,color:#172554,stroke-width:2px
+    classDef build fill:#E9F8F1,stroke:#16A34A,color:#14532D,stroke-width:2px
+    classDef release fill:#FFF3E6,stroke:#EA580C,color:#7C2D12,stroke-width:2px
+    class A,B,C validate
+    class D,E,F build
+    class G,H release
 ```
 
 | 阶段 | 需要验证的结果 |
