@@ -29,4 +29,4 @@ msbuild src\Desktop\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Config
 3. 云端或本地兼容 API：流式结果、停止、错误与首次未配置时不发送；历史分页搜索/删除/清空、笔记按日追加和重复提醒。
 4. 安装包、免安装版、开机启动和更新提示尚未实现；发布前还需完成这些交付项。
 
-当前 Linux 工作区没有 .NET Framework/MSBuild，因此本地仅完成 JS 语法、XML 解析与源码审查，不能把原型称为已通过 Windows 编译或兼容性验收。
+当前 Linux 工作区没有 .NET Framework/MSBuild。本分支的 GitHub Actions `windows-2022` 编译已通过；这不等同于 Windows 7/11 实机运行或目标程序兼容性验收。
