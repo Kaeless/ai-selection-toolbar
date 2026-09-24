@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+packages/
+TestResults/
+*.db
+*.sqlite
+*.sqlite3
+notes/

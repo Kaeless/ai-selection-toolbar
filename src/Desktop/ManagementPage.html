@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 划词工具栏 · 本机管理</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><h1>AI 划词工具栏</h1><p>本机设置与历史记录</p></header>
+    <nav><button id="settingsTab" class="selected">设置</button><button id="historyTab">历史记录</button></nav>
+    <section id="settingsPanel">
+      <h2>常规设置</h2>
+      <label class="check"><input id="autoShow" type="checkbox"> 捕获选中文字时显示浮窗</label>
+      <label>翻译目标语言 <input id="language" maxlength="50" placeholder="中文"></label>
+      <button id="saveSettings">保存设置</button>
+      <h2>模型连接</h2>
+      <label>API 地址 <input id="apiBaseUrl" type="url" maxlength="2048" placeholder="https://example.com/v1"></label>
+      <p class="hint">远程地址须使用 HTTPS；本机 127.0.0.1 或 localhost 可使用 HTTP。</p>
+      <label>模型名称 <input id="model" maxlength="200" placeholder="模型标识"></label>
+      <label>API key <input id="apiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="仅提交，不回显"></label>
+      <button id="saveConnection">提交连接配置</button>
+      <p class="hint">密钥保存在本机，设置页不会回显。同一地址留空会保留原密钥；更换地址时留空会清除原密钥。</p>
+      <h2>排除程序</h2>
+      <p class="hint">填写来源程序名，例如 notepad.exe。排除后，该程序的选区不会更新浮窗。</p>
+      <div class="inline"><input id="excludedInput" maxlength="200" placeholder="程序名"><button id="addExclusion">添加</button></div>
+      <ul id="excludedList"></ul>
+    </section>
+    <section id="historyPanel" hidden>
+      <h2>历史记录</h2><p class="hint">解释、翻译、提问与已确认的笔记。</p>
+      <div class="inline"><input id="historySearch" placeholder="搜索选区、问题或回答"><button id="clearHistory">清空全部</button></div>
+      <div id="historyList"></div>
+      <div class="inline"><button id="historyPrev">上一页</button><span id="historyPage"></span><button id="historyNext">下一页</button></div>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>
