@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace AiSelectionToolbar.Desktop
 {
@@ -22,6 +23,10 @@ namespace AiSelectionToolbar.Desktop
         private string _sourceApplication = "演示";
         private string _lastExplanation;
         private string _sourceTitle = "";
+        private Rectangle _selectionBounds;
+        private readonly DispatcherTimer _dismissTimer = new DispatcherTimer {
+            Interval = TimeSpan.FromSeconds(8)
+        };
 
         public IStreamingActionProvider ActionProvider { get; set; } = new DemoStreamingActionProvider();
         // Optional Core hooks. If absent the prototype keeps a bounded in-memory history.
@@ -38,6 +43,47 @@ namespace AiSelectionToolbar.Desktop
         public MainWindow()
         {
             InitializeComponent();
+            _dismissTimer.Tick += (sender, args) => {
+                _dismissTimer.Stop();
+                if (QuickPanel.Visibility == Visibility.Visible) Hide();
+            };
+        }
+
+        public void ShowExpanded()
+        {
+            _dismissTimer.Stop();
+            MinWidth = 420;
+            MinHeight = 320;
+            Width = 500;
+            Height = 380;
+            ResizeMode = ResizeMode.CanResizeWithGrip;
+            QuickPanel.Visibility = Visibility.Collapsed;
+            ExpandedPanel.Visibility = Visibility.Visible;
+            Topmost = false;
+            if (IsVisible)
+            {
+                if (!_selectionBounds.IsEmpty) PositionNearSelection(_selectionBounds);
+                else
+                {
+                    Left = Math.Max(SystemParameters.WorkArea.Left,
+                        SystemParameters.WorkArea.Right - Width - 24);
+                    Top = Math.Max(SystemParameters.WorkArea.Top,
+                        SystemParameters.WorkArea.Bottom - Height - 24);
+                }
+            }
+        }
+
+        private void ShowCompact()
+        {
+            _dismissTimer.Stop();
+            ResizeMode = ResizeMode.NoResize;
+            MinWidth = 275;
+            MinHeight = 60;
+            Width = 275;
+            Height = 60;
+            ExpandedPanel.Visibility = Visibility.Collapsed;
+            QuickPanel.Visibility = Visibility.Visible;
+            Topmost = true;
         }
 
         // A composition root may attach a source that publishes SelectionSnapshot values.
@@ -71,6 +117,8 @@ namespace AiSelectionToolbar.Desktop
             if (GetSettings().ExcludedApplications.Any(x =>
                 string.Equals(x, sourceApplication, StringComparison.OrdinalIgnoreCase))) return;
             CancelGeneration();
+            _selectionBounds = bounds;
+            ShowCompact();
             _sourceApplication = sourceApplication;
             _lastExplanation = null;
             _sourceTitle = sourceTitle ?? "";
@@ -83,6 +131,7 @@ namespace AiSelectionToolbar.Desktop
             {
                 if (!IsVisible) Show();
                 PositionNearSelection(bounds);
+                _dismissTimer.Start();
             }
         }
 
@@ -95,8 +144,8 @@ namespace AiSelectionToolbar.Desktop
             var desired = transform.Value.Transform(new System.Windows.Point(bounds.Right + 10, bounds.Bottom + 10));
             var topLeft = transform.Value.Transform(new System.Windows.Point(area.Left, area.Top));
             var bottomRight = transform.Value.Transform(new System.Windows.Point(area.Right, area.Bottom));
-            Left = Math.Max(topLeft.X, Math.Min(desired.X, bottomRight.X - ActualWidth));
-            Top = Math.Max(topLeft.Y, Math.Min(desired.Y, bottomRight.Y - ActualHeight));
+            Left = Math.Max(topLeft.X, Math.Min(desired.X, bottomRight.X - Width));
+            Top = Math.Max(topLeft.Y, Math.Min(desired.Y, bottomRight.Y - Height));
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -113,6 +162,7 @@ namespace AiSelectionToolbar.Desktop
 
         private void Window_Closed(object sender, EventArgs e)
         {
+            _dismissTimer.Stop();
             CancelGeneration();
             if (_selectionSource != null) _selectionSource.SelectionCaptured -= SelectionCaptured;
             if (_server != null) _server.Dispose();
@@ -123,7 +173,12 @@ namespace AiSelectionToolbar.Desktop
             if (e.OriginalSource is TextBlock || e.OriginalSource is Grid) DragMove();
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e) { Close(); }
+        private void Close_Click(object sender, RoutedEventArgs e)
+        {
+            _dismissTimer.Stop();
+            CancelGeneration();
+            Hide();
+        }
 
         private void Demo_Click(object sender, RoutedEventArgs e)
         {
@@ -151,6 +206,7 @@ namespace AiSelectionToolbar.Desktop
             var action = ((Button)sender).Tag as string;
             var selection = SelectionText.Text.Trim();
             if (selection.Length == 0) { StatusLabel.Text = "请先选择文字"; return; }
+            ShowExpanded();
             string prompt = "";
             if (action == "ask")
             {
@@ -182,7 +238,14 @@ namespace AiSelectionToolbar.Desktop
                 }
             }
             catch (OperationCanceledException) { if (_generation == cancellation) StatusLabel.Text = "已停止"; }
-            catch (Exception ex) { if (_generation == cancellation) StatusLabel.Text = "操作失败：" + ex.Message; }
+            catch (Exception ex)
+            {
+                if (_generation == cancellation)
+                {
+                    ResultText.AppendText((ResultText.Text.Length == 0 ? "" : "\n\n") + ex.Message);
+                    StatusLabel.Text = "操作失败，详情见结果区";
+                }
+            }
             finally
             {
                 if (_generation == cancellation) { _generation = null; StopButton.IsEnabled = false; }

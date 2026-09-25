@@ -32,6 +32,7 @@ namespace AiSelectionToolbar.Desktop
                 }));
                 window.Show();
                 if (host.IsConfigured) window.Hide();
+                else window.ShowExpanded();
                 if (!host.HotkeyAvailable)
                     MessageBox.Show(window, "Ctrl+Shift+Space 已被其他程序占用；鼠标划词仍可使用。",
                         "快捷键不可用", MessageBoxButton.OK, MessageBoxImage.Information);

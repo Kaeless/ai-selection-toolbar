@@ -1,8 +1,8 @@
 <Window x:Class="AiSelectionToolbar.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI 划词工具栏" Width="500" Height="380" MinWidth="420" MinHeight="320"
-        WindowStyle="None" ResizeMode="CanResizeWithGrip" AllowsTransparency="True"
+        Title="AI 划词工具栏" Width="275" Height="60" MinWidth="275" MinHeight="60"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" Topmost="True" ShowActivated="False" ShowInTaskbar="False"
         Loaded="Window_Loaded" Closed="Window_Closed">
   <Window.Resources>
@@ -13,7 +13,17 @@
       <Setter Property="FontSize" Value="13"/>
     </Style>
   </Window.Resources>
-  <Border Background="White" BorderBrush="#DCE3EF" BorderThickness="1" CornerRadius="12" Margin="5">
+  <Grid>
+  <Border x:Name="QuickPanel" Background="White" BorderBrush="#DCE3EF" BorderThickness="1" CornerRadius="10" Margin="4">
+    <Border.Effect><DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.18"/></Border.Effect>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+      <Button Content="解释" Tag="explain" Click="Action_Click"/>
+      <Button Content="翻译" Tag="translate" Click="Action_Click"/>
+      <Button Content="提问" Tag="ask" Click="Action_Click"/>
+      <Button Content="×" Click="Close_Click" Padding="8,5" Margin="0" ToolTip="收起工具栏"/>
+    </StackPanel>
+  </Border>
+  <Border x:Name="ExpandedPanel" Visibility="Collapsed" Background="White" BorderBrush="#DCE3EF" BorderThickness="1" CornerRadius="12" Margin="5">
     <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.18"/></Border.Effect>
     <Grid Margin="16">
       <Grid.RowDefinitions>
@@ -24,7 +34,7 @@
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <TextBlock Text="AI 划词工具栏" FontWeight="SemiBold" FontSize="15" Foreground="#142746" VerticalAlignment="Center"/>
         <Button Grid.Column="1" Content="管理" Click="Manage_Click" ToolTip="打开本机设置与历史记录"/>
-        <Button Grid.Column="2" Content="×" Click="Close_Click" Padding="9,4" Margin="0" ToolTip="退出"/>
+        <Button Grid.Column="2" Content="×" Click="Close_Click" Padding="9,4" Margin="0" ToolTip="收起工具栏"/>
       </Grid>
       <StackPanel Grid.Row="1" Margin="0,10,0,0">
         <TextBlock x:Name="SourceLabel" FontSize="11" Foreground="#72809A" Text="演示选区"/>
@@ -43,9 +53,10 @@
                Background="#F8FAFD" FontSize="13" Text="选择操作后，这里会逐段显示结果。"/>
       <Grid Grid.Row="4" Margin="0,10,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <TextBlock x:Name="StatusLabel" Text="就绪" FontSize="11" Foreground="#72809A" VerticalAlignment="Center"/>
+        <TextBlock x:Name="StatusLabel" Text="就绪" FontSize="11" Foreground="#72809A" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
         <Button Grid.Column="1" Content="载入演示选区" Click="Demo_Click" Margin="0"/>
       </Grid>
     </Grid>
   </Border>
+  </Grid>
 </Window>

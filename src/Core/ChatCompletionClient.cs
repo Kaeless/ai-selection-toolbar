@@ -60,8 +60,18 @@ namespace AiSelectionToolbar.Core
                     if (!response.IsSuccessStatusCode)
                     {
                         var details = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        if (details.Length > 1024) details = details.Substring(0, 1024);
-                        throw new HttpRequestException("Chat API returned " + (int)response.StatusCode + ": " + details);
+                        try
+                        {
+                            using (var buffer = new MemoryStream(Encoding.UTF8.GetBytes(details)))
+                            {
+                                var body = (ResponseBody)new DataContractJsonSerializer(typeof(ResponseBody)).ReadObject(buffer);
+                                if (!string.IsNullOrWhiteSpace(body?.Error?.Message))
+                                    details = body.Error.Message;
+                            }
+                        }
+                        catch (SerializationException) { /* Keep the provider's original error text. */ }
+                        if (details.Length > 2048) details = details.Substring(0, 2048);
+                        throw new HttpRequestException("接口返回 HTTP " + (int)response.StatusCode + "：" + details);
                     }
                     using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
                     using (timeout.Token.Register(() => stream.Dispose()))
