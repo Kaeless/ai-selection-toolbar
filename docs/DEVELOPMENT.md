@@ -35,4 +35,4 @@ CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含安�
 3. 云端或本地兼容 API：流式结果、停止、错误与首次未配置时不发送；历史分页搜索/删除/清空、笔记按日追加和重复提醒。
 4. 安装包和便携版的启动、卸载及文件完整性；登录启动开关和自定义笔记目录。检查更新及其提示仍待实现。
 
-当前 Linux 工作区没有 .NET Framework/MSBuild。本分支的 GitHub Actions `windows-2022` 编译已通过；这不等同于 Windows 7/11 实机运行或目标程序兼容性验收。
+当前 Linux 工作区没有 .NET Framework/MSBuild。本分支的 GitHub Actions `windows-2022` 已通过编译、打包、安装/便携 SQLite 读写、桌面程序启动、本机管理页和卸载检查；详见[Windows 实机验收记录](./WINDOWS-ACCEPTANCE.md)。这些结果不等同于 Windows 7/11 实机运行或目标程序兼容性验收。
