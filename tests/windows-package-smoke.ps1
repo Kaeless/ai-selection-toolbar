@@ -62,15 +62,41 @@ function Probe-Sqlite([string]$Path) {
     if ($LASTEXITCODE -ne 0) { throw "SQLite probe failed for $Path" }
 }
 
+function Probe-Desktop([string]$Path) {
+    $process = Start-Process -FilePath (Join-Path $Path 'AiSelectionToolbar.Desktop.exe') -PassThru
+    try {
+        $port = $null
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            if ($process.HasExited) { throw "Desktop exited during startup: $($process.ExitCode)" }
+            $listener = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+                Where-Object { $_.OwningProcess -eq $process.Id -and $_.LocalAddress -eq '127.0.0.1' })
+            if ($listener.Count -gt 0) { $port = $listener[0].LocalPort; break }
+            Start-Sleep -Milliseconds 500
+        }
+        if (!$port) { throw "Desktop did not start its loopback management server: $Path" }
+        $page = Invoke-WebRequest "http://127.0.0.1:$port/" -NoProxy -UseBasicParsing -TimeoutSec 5
+        if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'settingsPanel') {
+            throw 'Management page did not load'
+        }
+        $unauthorized = Invoke-WebRequest "http://127.0.0.1:$port/api/settings" -NoProxy -UseBasicParsing -SkipHttpErrorCheck -TimeoutSec 5
+        if ($unauthorized.StatusCode -ne 401) { throw 'Management API accepted a request without a token' }
+        Write-Host "Desktop startup and loopback API passed: $Path"
+    } finally {
+        if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
+    }
+}
+
 try {
     Expand-Archive -LiteralPath $portableZip -DestinationPath $portable
     Probe-Sqlite $portable
+    Probe-Desktop $portable
 
     $installProcess = Start-Process -FilePath $setup -ArgumentList @(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installed"
     ) -Wait -PassThru
     if ($installProcess.ExitCode -ne 0) { throw "Installer failed: $($installProcess.ExitCode)" }
     Probe-Sqlite $installed
+    Probe-Desktop $installed
 
     $uninstaller = Join-Path $installed 'unins000.exe'
     if (!(Test-Path -LiteralPath $uninstaller -PathType Leaf)) { throw 'Missing uninstaller' }
@@ -81,7 +107,7 @@ try {
     if (Test-Path -LiteralPath (Join-Path $installed 'AiSelectionToolbar.Desktop.exe')) {
         throw 'Application executable remains after uninstall'
     }
-    Write-Host 'Portable extraction, installer, SQLite and uninstall smoke checks passed.'
+    Write-Host 'Portable, installer, desktop startup, SQLite and uninstall smoke checks passed.'
 } finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }
