@@ -25,7 +25,8 @@ jobs:
           if (!(Test-Path $package)) { throw 'SQLite NuGet package missing after restore' }
           $native = @(Get-ChildItem $package -Filter SQLite.Interop.dll -Recurse -File |
             Where-Object { $_.FullName -match '[\\/]x64[\\/]' })
-          if ($native.Count -ne 1) { throw "Expected one SQLite x64 native library; found $($native.Count)" }
+          $native = @($native | Where-Object { $_.FullName -match 'net46' })
+          if ($native.Count -ne 1) { throw "Expected one net46 SQLite x64 library; candidates: $($native.FullName -join ', ')" }
           New-Item -ItemType Directory -Path "$release/x64" -Force | Out-Null
           Copy-Item $native[0].FullName "$release/x64/SQLite.Interop.dll" -Force
           if (!(Test-Path "$release/x64/SQLite.Interop.dll")) { throw 'SQLite x64 native library missing' }
