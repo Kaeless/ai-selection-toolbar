@@ -21,6 +21,13 @@ jobs:
         shell: pwsh
         run: |
           $release = Resolve-Path 'src/Desktop/bin/Release'
+          $package = Join-Path $env:USERPROFILE '.nuget/packages/stub.system.data.sqlite.core.netframework/1.0.119'
+          if (!(Test-Path $package)) { throw 'SQLite NuGet package missing after restore' }
+          $native = @(Get-ChildItem $package -Filter SQLite.Interop.dll -Recurse -File |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]' })
+          if ($native.Count -ne 1) { throw "Expected one SQLite x64 native library; found $($native.Count)" }
+          New-Item -ItemType Directory -Path "$release/x64" -Force | Out-Null
+          Copy-Item $native[0].FullName "$release/x64/SQLite.Interop.dll" -Force
           if (!(Test-Path "$release/x64/SQLite.Interop.dll")) { throw 'SQLite x64 native library missing' }
           if (!(Test-Path "$release/System.Data.SQLite.dll")) { throw 'SQLite managed library missing' }
           New-Item -ItemType Directory -Path dist -Force | Out-Null
