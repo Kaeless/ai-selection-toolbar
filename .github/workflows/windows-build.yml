@@ -41,6 +41,9 @@ jobs:
           if (!(Test-Path $compiler)) { throw 'Inno Setup compiler missing from Windows runner' }
           & $compiler 'installer/AiSelectionToolbar.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke test portable and installer packages
+        shell: pwsh
+        run: ./tests/windows-package-smoke.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64-packages
