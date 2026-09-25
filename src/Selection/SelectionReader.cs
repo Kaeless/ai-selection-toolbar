@@ -62,10 +62,22 @@ namespace AiSelectionToolbar.Selection
             try
             {
                 AutomationElement element = AutomationElement.FocusedElement;
-                if (element == null || element.Current.ProcessId != (int)processId)
+                if (element == null || !BelongsToWindow(element, window, (int)processId))
                     return null;
 
-                TextPattern pattern = FindTextPattern(element, (int)processId);
+                int focusedProcessId = element.Current.ProcessId;
+                if (focusedProcessId != (int)processId && focusedProcessId > 0)
+                {
+                    // A text provider can live in a different process from its host window.
+                    // Check that process's exclusion too, before asking it for selected text.
+                    using (Process focusedProcess = Process.GetProcessById(focusedProcessId))
+                    {
+                        if (excludedProcessNames.Contains(NormalizeProcessName(focusedProcess.ProcessName)))
+                            return null;
+                    }
+                }
+
+                TextPattern pattern = FindTextPattern(element, window);
                 if (pattern == null)
                     return null;
 
@@ -99,24 +111,42 @@ namespace AiSelectionToolbar.Selection
             catch (Exception exception) when (exception is ElementNotAvailableException ||
                                               exception is InvalidOperationException ||
                                               exception is COMException ||
-                                              exception is UnauthorizedAccessException)
+                                              exception is UnauthorizedAccessException ||
+                                              exception is ArgumentException ||
+                                              exception is System.ComponentModel.Win32Exception)
             {
                 return null;
             }
         }
 
-        private static TextPattern FindTextPattern(AutomationElement element, int processId)
+        private static bool BelongsToWindow(AutomationElement element, IntPtr window, int processId)
+        {
+            int focusedProcessId = element.Current.ProcessId;
+            for (int depth = 0; element != null && depth < 32; depth++)
+            {
+                int handle = element.Current.NativeWindowHandle;
+                if (handle != 0)
+                    return GetAncestor(new IntPtr(handle), 2) == window; // GA_ROOT
+
+                element = TreeWalker.RawViewWalker.GetParent(element);
+            }
+
+            // A provider with no HWND can only be attributed to the host by PID.
+            return focusedProcessId == processId;
+        }
+
+        private static TextPattern FindTextPattern(AutomationElement element, IntPtr window)
         {
             for (int depth = 0; element != null && depth < 32; depth++)
             {
-                if (element.Current.ProcessId != processId)
+                int handle = element.Current.NativeWindowHandle;
+                if (handle != 0 && GetAncestor(new IntPtr(handle), 2) != window)
                     break;
-
                 object pattern;
                 if (element.TryGetCurrentPattern(TextPattern.Pattern, out pattern))
                     return (TextPattern)pattern;
 
-                element = TreeWalker.ControlViewWalker.GetParent(element);
+                element = TreeWalker.RawViewWalker.GetParent(element);
             }
 
             return null;
@@ -174,6 +204,9 @@ namespace AiSelectionToolbar.Selection
 
         [DllImport("user32.dll")]
         private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr window, uint flags);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetWindowTextLength(IntPtr window);

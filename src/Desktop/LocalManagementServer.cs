@@ -157,7 +157,9 @@ namespace AiSelectionToolbar.Desktop
                         {
                             var settings = serializer.Deserialize<DesktopSettings>(json);
                             if (settings == null || string.IsNullOrWhiteSpace(settings.TargetLanguage) ||
-                                settings.TargetLanguage.Length > 50) throw new ArgumentException("Invalid settings");
+                                settings.TargetLanguage.Length > 50 ||
+                                (settings.NotesDirectory != null && settings.NotesDirectory.Length > 2048))
+                                throw new ArgumentException("Invalid settings");
                             _setSettings(settings);
                         }
                         else if (path == "/api/connection")
@@ -203,9 +205,13 @@ namespace AiSelectionToolbar.Desktop
                 }
                 catch (ArgumentException)
                 {
-                    try { Respond(client.GetStream(), 400, "text/plain", "Invalid input"); } catch { }
+                    try { Respond(client.GetStream(), 400, "text/plain", "输入值无效，请检查目录或程序路径。"); } catch { }
                 }
-                catch (Exception) { /* A disconnected or malformed client cannot stop the listener. */ }
+                catch (Exception)
+                {
+                    try { Respond(client.GetStream(), 500, "text/plain", "保存失败，请检查目录或 Windows 启动项权限。"); }
+                    catch { /* A disconnected client cannot stop the listener. */ }
+                }
             }
         }
 

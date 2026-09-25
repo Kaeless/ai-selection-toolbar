@@ -13,7 +13,6 @@ namespace AiSelectionToolbar.Desktop
         private readonly object gate = new object();
         private readonly SettingsStore settingsStore = new SettingsStore(SettingsStore.DefaultPath);
         private readonly HistoryStore history = new HistoryStore(HistoryStore.DefaultPath);
-        private readonly MarkdownNoteStore notes = new MarkdownNoteStore(MarkdownNoteStore.DefaultDirectory);
         private readonly ChatCompletionClient chat = new ChatCompletionClient();
         private SelectionTrigger trigger;
         private AppSettings settings;
@@ -25,6 +24,11 @@ namespace AiSelectionToolbar.Desktop
         public IntegratedHost()
         {
             settings = settingsStore.Load() ?? new AppSettings();
+            if (settings.StartOnLogin)
+            {
+                try { StartupRegistration.SetEnabled(true); }
+                catch (Exception) { /* A moved portable executable can be repaired from Settings. */ }
+            }
         }
 
         public void Connect(MainWindow window)
@@ -111,6 +115,8 @@ namespace AiSelectionToolbar.Desktop
         {
             lock (gate) return new DesktopSettings {
                 AutoShow = settings.AutoShow, TargetLanguage = settings.TranslationTargetLanguage,
+                StartOnLogin = settings.StartOnLogin && StartupRegistration.IsEnabledForCurrentExecutable(),
+                NotesDirectory = MarkdownNoteStore.ResolveDirectory(settings.NotesDirectory),
                 ApiBaseUrl = settings.BaseUrl, Model = settings.Model,
                 ExcludedApplications = new List<string>(settings.ExcludedApplications ?? new List<string>())
             };
@@ -120,10 +126,22 @@ namespace AiSelectionToolbar.Desktop
         {
             lock (gate)
             {
-                settings.AutoShow = value.AutoShow;
-                settings.TranslationTargetLanguage = value.TargetLanguage;
-                settings.ExcludedApplications = new List<string>(value.ExcludedApplications ?? new List<string>());
-                settingsStore.Save(settings);
+                var notesDirectory = MarkdownNoteStore.ResolveDirectory(value.NotesDirectory);
+                var updated = Clone(settings);
+                updated.AutoShow = value.AutoShow;
+                updated.StartOnLogin = value.StartOnLogin;
+                updated.NotesDirectory = notesDirectory;
+                updated.TranslationTargetLanguage = value.TargetLanguage;
+                updated.ExcludedApplications = new List<string>(value.ExcludedApplications ?? new List<string>());
+                StartupRegistration.SetEnabled(updated.StartOnLogin);
+                try { settingsStore.Save(updated); }
+                catch
+                {
+                    try { StartupRegistration.SetEnabled(settings.StartOnLogin); }
+                    catch { /* Preserve the original settings write error. */ }
+                    throw;
+                }
+                settings = updated;
             }
         }
 
@@ -165,6 +183,8 @@ namespace AiSelectionToolbar.Desktop
 
         private void SaveNote(string selection, string edited, string application, string title)
         {
+            string notesDirectory;
+            lock (gate) notesDirectory = settings.NotesDirectory;
             var entry = new HistoryEntry {
                 CreatedUtc = DateTime.UtcNow, Action = "note", SelectedText = selection,
                 Response = edited, Source = title ?? application,
@@ -172,7 +192,7 @@ namespace AiSelectionToolbar.Desktop
             };
             // Record first so a failed Markdown write can remove the corresponding history row.
             history.Add(entry);
-            try { notes.Append(entry); }
+            try { new MarkdownNoteStore(notesDirectory).Append(entry); }
             catch
             {
                 history.Delete(entry.Id);
@@ -185,7 +205,8 @@ namespace AiSelectionToolbar.Desktop
             ProtectedApiKey = source.ProtectedApiKey,
             TranslationTargetLanguage = source.TranslationTargetLanguage,
             ExcludedApplications = new List<string>(source.ExcludedApplications ?? new List<string>()),
-            AutoShow = source.AutoShow
+            AutoShow = source.AutoShow, StartOnLogin = source.StartOnLogin,
+            NotesDirectory = source.NotesDirectory
         };
 
         public void Dispose()

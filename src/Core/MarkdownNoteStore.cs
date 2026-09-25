@@ -14,11 +14,37 @@ namespace AiSelectionToolbar.Core
 
         public MarkdownNoteStore(string directory)
         {
-            this.directory = directory ?? throw new ArgumentNullException(nameof(directory));
+            this.directory = ResolveDirectory(directory);
         }
 
         public static string DefaultDirectory => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "AiSelectionToolbar", "Notes");
+
+        /// <summary>Returns an absolute path. Blank values use the existing Documents default.</summary>
+        public static string ResolveDirectory(string configuredDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(configuredDirectory)) return DefaultDirectory;
+            var path = configuredDirectory.Trim();
+            if (path.Length > 32767 || path.IndexOfAny(new[] { '\0', '\r', '\n' }) >= 0 ||
+                !Path.IsPathRooted(path))
+                throw new ArgumentException("Notes directory must be an absolute path.", nameof(configuredDirectory));
+            if (Path.DirectorySeparatorChar == '\\')
+            {
+                var drive = path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' &&
+                    (path[2] == '\\' || path[2] == '/');
+                var unc = path.StartsWith(@"\\", StringComparison.Ordinal) &&
+                    !path.StartsWith(@"\\?\", StringComparison.Ordinal) &&
+                    !path.StartsWith(@"\\.\", StringComparison.Ordinal);
+                if (!drive && !unc)
+                    throw new ArgumentException("Notes directory must include a drive or UNC share.", nameof(configuredDirectory));
+            }
+            try { return Path.GetFullPath(path); }
+            catch (Exception ex) when (ex is ArgumentException || ex is NotSupportedException ||
+                ex is PathTooLongException)
+            {
+                throw new ArgumentException("Invalid notes directory.", nameof(configuredDirectory), ex);
+            }
+        }
 
         public string Append(HistoryEntry entry)
         {

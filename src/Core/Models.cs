@@ -15,6 +15,8 @@ namespace AiSelectionToolbar.Core
         [DataMember(Order = 5)] public string TranslationTargetLanguage { get; set; } = "中文";
         [DataMember(Order = 6)] public List<string> ExcludedApplications { get; set; } = new List<string>();
         [DataMember(Order = 7)] public bool AutoShow { get; set; } = true;
+        [DataMember(Order = 8)] public string NotesDirectory { get; set; }
+        [DataMember(Order = 9)] public bool StartOnLogin { get; set; }
         // Local OpenAI-compatible endpoints may intentionally have no API key.
         public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(Model);
 

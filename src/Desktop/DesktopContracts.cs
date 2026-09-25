@@ -71,7 +71,9 @@ namespace AiSelectionToolbar.Desktop
     public sealed class DesktopSettings
     {
         public bool AutoShow { get; set; } = true;
+        public bool StartOnLogin { get; set; }
         public string TargetLanguage { get; set; } = "中文";
+        public string NotesDirectory { get; set; } = "";
         public string ApiBaseUrl { get; set; } = "";
         public string Model { get; set; } = "";
         public List<string> ExcludedApplications { get; set; } = new List<string>();

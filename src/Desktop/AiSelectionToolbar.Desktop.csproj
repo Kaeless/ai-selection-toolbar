@@ -41,6 +41,7 @@
     <Compile Include="DesktopContracts.cs" />
     <Compile Include="LocalManagementServer.cs" />
     <Compile Include="IntegratedHost.cs" />
+    <Compile Include="StartupRegistration.cs" />
     <Compile Include="..\Selection\SelectionSnapshot.cs"><Link>Selection\SelectionSnapshot.cs</Link></Compile>
     <Compile Include="..\Selection\SelectionReader.cs"><Link>Selection\SelectionReader.cs</Link></Compile>
     <Compile Include="..\Selection\SelectionTrigger.cs"><Link>Selection\SelectionTrigger.cs</Link></Compile>

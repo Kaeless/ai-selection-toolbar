@@ -269,11 +269,13 @@ namespace AiSelectionToolbar.Desktop
                 var external = LoadSettings();
                 if (external != null) return new DesktopSettings {
                     AutoShow = external.AutoShow, TargetLanguage = external.TargetLanguage,
+                    StartOnLogin = external.StartOnLogin, NotesDirectory = external.NotesDirectory,
                     ApiBaseUrl = external.ApiBaseUrl, Model = external.Model,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
             }
             lock (_stateLock) return new DesktopSettings { AutoShow = _settings.AutoShow,
                 TargetLanguage = _settings.TargetLanguage,
+                StartOnLogin = _settings.StartOnLogin, NotesDirectory = _settings.NotesDirectory,
                 ApiBaseUrl = _settings.ApiBaseUrl, Model = _settings.Model,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };
         }
@@ -283,6 +285,8 @@ namespace AiSelectionToolbar.Desktop
             var current = GetSettings();
             current.AutoShow = value.AutoShow;
             current.TargetLanguage = value.TargetLanguage;
+            current.StartOnLogin = value.StartOnLogin;
+            current.NotesDirectory = value.NotesDirectory;
             PersistSettings(current);
         }
 

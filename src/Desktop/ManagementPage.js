@@ -15,14 +15,16 @@ async function api(path, method = "GET", body) {
     cache: "no-store",
     credentials: "omit"
   });
-  if (!response.ok) throw new Error("请求失败（" + response.status + "）");
+  if (!response.ok) throw new Error((await response.text()) || "请求失败（" + response.status + "）");
   return response.json();
 }
 
 async function loadSettings() {
   const value = await api("/api/settings");
   byId("autoShow").checked = value.AutoShow;
+  byId("startOnLogin").checked = !!value.StartOnLogin;
   byId("language").value = value.TargetLanguage || "";
+  byId("notesDirectory").value = value.NotesDirectory || "";
   byId("apiBaseUrl").value = value.ApiBaseUrl || "";
   byId("model").value = value.Model || "";
   byId("apiKey").value = "";
@@ -73,7 +75,9 @@ async function loadHistory() {
 async function run(fn) { try { await fn(); } catch (error) { status(error.message); } }
 byId("saveSettings").addEventListener("click", () => run(async () => {
   await api("/api/settings", "POST", {AutoShow: byId("autoShow").checked,
-    TargetLanguage: byId("language").value.trim()});
+    StartOnLogin: byId("startOnLogin").checked,
+    TargetLanguage: byId("language").value.trim(),
+    NotesDirectory: byId("notesDirectory").value.trim()});
   status("设置已保存");
 }));
 byId("saveConnection").addEventListener("click", () => run(async () => {

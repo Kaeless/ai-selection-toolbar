@@ -22,11 +22,17 @@ msbuild src\Desktop\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Config
 
 工程目标进程为 x64。NuGet 包 `System.Data.SQLite.Core` 固定为 `1.0.119`；发布时确认输出目录含 `x64/SQLite.Interop.dll` 和托管提供程序，再将 Release 输出目录打包。API 密钥由当前 Windows 用户的 DPAPI 保护；复制设置文件到其他用户账户无法解密。
 
+## 打包与安装
+
+CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含安装程序和便携压缩包。Windows 本机也可运行 `ISCC.exe installer\AiSelectionToolbar.iss`，将安装程序生成到 `dist`。便携版解压后运行 `AiSelectionToolbar.Desktop.exe`。
+
+两种版本都要求目标计算机已安装 .NET Framework 4.8 或更高版本；安装程序会在安装前检查，便携版需用户自行确认。安装程序按当前用户安装到 `%LOCALAPPDATA%\Programs\AiSelectionToolbar`。登录启动可以在设置中开启，默认关闭；移动便携版后重新运行，会更新已启用的启动项路径。笔记默认在用户“文档”中的 `AiSelectionToolbar\Notes`，设置中可指定绝对目录。
+
 ## 必须在 Windows 验证
 
 1. Win7 SP1 x64 与 Win11：启动、SQLite 原生库加载、配置与管理页；验证本机管理页无法从其他设备访问。
 2. Chrome、Edge、Firefox、Word、PowerPoint、Adobe Acrobat Reader：拖选后的文字、位置、标题及排除程序。UI Automation provider 的能力由应用版本决定；扫描版 PDF 不在首版范围。
 3. 云端或本地兼容 API：流式结果、停止、错误与首次未配置时不发送；历史分页搜索/删除/清空、笔记按日追加和重复提醒。
-4. 安装包、免安装版、开机启动和更新提示尚未实现；发布前还需完成这些交付项。
+4. 安装包和便携版的启动、卸载及文件完整性；登录启动开关和自定义笔记目录。检查更新及其提示仍待实现。
 
 当前 Linux 工作区没有 .NET Framework/MSBuild。本分支的 GitHub Actions `windows-2022` 编译已通过；这不等同于 Windows 7/11 实机运行或目标程序兼容性验收。
