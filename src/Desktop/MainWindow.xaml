@@ -1,7 +1,7 @@
 <Window x:Class="AiSelectionToolbar.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI 划词工具栏" Width="275" Height="60" MinWidth="275" MinHeight="60"
+        Title="AI 划词工具栏" Icon="Assets/AppIcon.ico" Width="275" Height="60" MinWidth="275" MinHeight="60"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" Topmost="True" ShowActivated="False" ShowInTaskbar="False"
         Loaded="Window_Loaded" Closed="Window_Closed">

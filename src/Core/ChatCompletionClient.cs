@@ -71,7 +71,8 @@ namespace AiSelectionToolbar.Core
                         }
                         catch (SerializationException) { /* Keep the provider's original error text. */ }
                         if (details.Length > 2048) details = details.Substring(0, 2048);
-                        throw new HttpRequestException("接口返回 HTTP " + (int)response.StatusCode + "：" + details);
+                        throw new HttpRequestException("接口 " + uri.Host + " 返回 HTTP " +
+                            (int)response.StatusCode + "（模型 " + settings.Model + "）：" + details);
                     }
                     using (var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
                     using (timeout.Token.Register(() => stream.Dispose()))

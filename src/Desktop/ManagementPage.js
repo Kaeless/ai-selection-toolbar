@@ -83,8 +83,8 @@ byId("saveSettings").addEventListener("click", () => run(async () => {
 byId("saveConnection").addEventListener("click", () => run(async () => {
   await api("/api/connection", "POST", {ApiBaseUrl: byId("apiBaseUrl").value.trim(),
     Model: byId("model").value.trim(), ApiKey: byId("apiKey").value});
-  byId("apiKey").value = "";
-  status("连接配置已提交给桌面端");
+  await loadSettings();
+  status("连接配置已保存，当前模型：" + byId("model").value);
 }));
 byId("addExclusion").addEventListener("click", () => run(async () => {
   const name = byId("excludedInput").value.trim();
