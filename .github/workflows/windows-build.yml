@@ -48,10 +48,11 @@ jobs:
         shell: pwsh
         run: |
           $release = (Resolve-Path 'src/Desktop/bin/Release').Path
+          $source = (Resolve-Path 'tests/ChatStreamSmoke.cs').Path
           $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
           & $compiler /nologo /target:exe /out:"$release/ChatStreamSmoke.exe" `
             /reference:"$release/AiSelectionToolbar.Desktop.exe" /reference:System.Net.Http.dll `
-            tests/ChatStreamSmoke.cs
+            "$source"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$release/ChatStreamSmoke.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
