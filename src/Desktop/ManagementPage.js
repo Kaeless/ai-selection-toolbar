@@ -58,7 +58,7 @@ function updatePreview() {
   document.documentElement.style.setProperty("--accent", color);
   const preview = byId("toolbarPreview");
   preview.classList.toggle("compact", byId("toolbarStyle").value === "compact");
-  while (preview.children.length > 4) preview.lastElementChild.remove();
+  while (preview.children.length > 5) preview.lastElementChild.remove();
   for (const item of customActions) {
     const chip = document.createElement("span"); chip.textContent = item.Name || "新按钮"; preview.append(chip);
   }
