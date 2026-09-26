@@ -18,6 +18,8 @@ internal static class Program
             using var host = new LinuxHost();
             using var selection = new LinuxSelectionService(host.LoadSettings().ExcludedApplications);
             using var window = new LinuxWindow(host, selection);
+            if (!host.LoadSettings().IsConfigured || args.Contains("--settings", StringComparer.Ordinal))
+                window.ShowManagement();
             selection.Start();
             Application.Run();
             return 0;

@@ -11,7 +11,7 @@ sudo apt install libgtk-3-0 libx11-6 xclip
 dotnet run --project src/Linux/AiSelectionToolbar.Linux.csproj
 ```
 
-开发机还需 .NET 8 SDK；发布的 `linux-x64` 自包含压缩包不需要另行安装 .NET，但仍依赖 GTK 3、X11 和 `xclip`。登录时选择 Xorg 会话。解压 CI 工件后，运行 `AiSelectionToolbar.Linux`。首次配置 API 地址、模型和密钥，然后在其他程序中划词；也可选中文字后按 Ctrl+Shift+Space。
+开发机还需 .NET 8 SDK；发布的 `linux-x64` 自包含压缩包不需要另行安装 .NET，但仍依赖 GTK 3、X11 和 `xclip`。登录时选择 Xorg 会话。解压 CI 工件后，运行 `AiSelectionToolbar.Linux`。首次启动会打开设置；后续可通过托盘进入，或用 `AiSelectionToolbar.Linux --settings` 打开设置。配置 API 地址、模型和密钥后，在其他程序中划词；也可选中文字后按 Ctrl+Shift+Space。
 
 设置存于 `${XDG_CONFIG_HOME:-~/.config}/ai-selection-toolbar/settings.json`；API 密钥另存为仅当前用户可读的 `api-key`，与 Windows DPAPI 文件不能互换。历史存于 `${XDG_DATA_HOME:-~/.local/share}/ai-selection-toolbar/history.db`。联网只发生在用户点击 AI 操作后；云端地址必须为 HTTPS，本机回环可用 HTTP。
 

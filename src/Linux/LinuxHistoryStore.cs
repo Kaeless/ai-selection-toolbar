@@ -1,5 +1,6 @@
 using AiSelectionToolbar.Core;
 using Microsoft.Data.Sqlite;
+using System.Text.RegularExpressions;
 
 namespace AiSelectionToolbar.Linux;
 
@@ -33,9 +34,10 @@ internal sealed class LinuxHistoryStore : IDisposable
             using var command = db.CreateCommand();
             command.CommandText = "INSERT INTO history(created_utc_ticks,selection_hash,selected_text,action,prompt,source,source_application,source_file,source_title,response) " +
                 "VALUES($time,$hash,$text,$action,$prompt,$source,$app,$file,$title,$response)";
-            var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(entry.SelectedText));
+            var normalized = Regex.Replace(entry.SelectedText.Trim(), @"\s+", " ");
+            var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalized));
             command.Parameters.AddWithValue("$time", (entry.CreatedUtc == default ? DateTime.UtcNow : entry.CreatedUtc.ToUniversalTime()).Ticks);
-            command.Parameters.AddWithValue("$hash", Convert.ToHexString(bytes).ToLowerInvariant());
+            command.Parameters.AddWithValue("$hash", Convert.ToBase64String(bytes));
             command.Parameters.AddWithValue("$text", entry.SelectedText);
             command.Parameters.AddWithValue("$action", (object)entry.Action ?? DBNull.Value);
             command.Parameters.AddWithValue("$prompt", (object)entry.Prompt ?? DBNull.Value);
