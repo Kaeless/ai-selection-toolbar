@@ -74,6 +74,7 @@ namespace AiSelectionToolbar.Desktop
             ResizeMode = ResizeMode.NoResize;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
+            ApplyAnswerAppearance();
             Topmost = true;
             if (IsVisible)
             {
@@ -139,6 +140,17 @@ namespace AiSelectionToolbar.Desktop
             _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
             QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
                 new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
+        }
+
+        private void ApplyAnswerAppearance()
+        {
+            var settings = GetSettings();
+            System.Windows.Media.Color background;
+            try { background = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.AnswerBackgroundColor ?? "#F8FAFC"); }
+            catch { background = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"); }
+            var brush = new SolidColorBrush(background);
+            ExpandedPanel.Background = brush;
+            ResultView.Background = brush;
         }
 
         private Button CreateCustomButton(CustomActionDefinition custom)

@@ -146,6 +146,7 @@ class AnswerWindow(QWidget):
         layout.setContentsMargins(18, 16, 18, 16)
         self.heading = QLabel("正在生成回答…")
         self.heading.setObjectName("heading")
+        self.heading.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 5)
         header.addWidget(self.heading)
@@ -190,7 +191,7 @@ class AnswerWindow(QWidget):
             QLabel#heading {{ color: #172033; font-size: 18px; font-weight: 650; padding: 2px 2px 0; }}
             QPushButton#pinButton {{ min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; padding: 0;
                                     border-radius: 16px; font-size: 16px; }}
-            QTextBrowser {{ background: #ffffff; color: #243149; border: 1px solid #d6deea;
+            QTextBrowser {{ background: {self._background.name()}; color: #243149; border: 1px solid #d6deea;
                            border-radius: 16px; padding: 16px; font-size: 14px; selection-background-color: {_light(self._accent, 180)}; }}
             QPushButton {{ background: #ffffff; color: #35445d; border: 1px solid #d6deea;
                           border-radius: 999px; padding: 9px 17px; }}

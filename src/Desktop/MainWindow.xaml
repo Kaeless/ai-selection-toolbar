@@ -4,7 +4,7 @@
         Title="AI 划词工具栏" Icon="Assets/AppIcon.ico" Width="520" Height="62" MinWidth="520" MinHeight="62"
         WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
         Background="Transparent" Topmost="True" ShowActivated="False" ShowInTaskbar="False"
-        Loaded="Window_Loaded" Closed="Window_Closed">
+        Loaded="Window_Loaded" Closed="Window_Closed" MouseLeftButtonDown="Header_MouseLeftButtonDown">
   <Window.Resources>
     <Style TargetType="Button">
       <Setter Property="Padding" Value="12,7"/><Setter Property="Margin" Value="0,0,5,0"/>

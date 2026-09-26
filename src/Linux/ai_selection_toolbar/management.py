@@ -40,7 +40,7 @@ class ManagementServer:
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
-            server_version = "AiSelectionToolbar/0.4"
+            server_version = "AiSelectionToolbar/0.5"
 
             def log_message(self, _format: str, *_args: object) -> None:
                 return
