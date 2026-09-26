@@ -51,6 +51,21 @@ public sealed class LinuxHost : IDisposable
     public IList<HistoryEntry> SearchHistory(string term) => history.Search(term);
     public void SaveHistory(HistoryEntry entry) => history.Add(entry);
 
+    public string SaveNote(string text, string editedAnswer, string application, string title)
+    {
+        if (string.IsNullOrWhiteSpace(editedAnswer)) throw new ArgumentException("笔记内容不能为空。");
+        if (history.HasNote(text, editedAnswer)) throw new InvalidOperationException("这条笔记已经保存过。");
+        var current = LoadSettings();
+        var entry = new HistoryEntry {
+            CreatedUtc = DateTime.UtcNow, Action = "note", SelectedText = text,
+            Response = editedAnswer, SourceApplication = application, SourceTitle = title,
+            Source = string.IsNullOrWhiteSpace(title) ? application : title
+        };
+        var path = new MarkdownNoteStore(current.NotesDirectory).Append(entry);
+        history.Add(entry);
+        return path;
+    }
+
     public async Task RunActionAsync(string action, string text, string prompt,
         IProgress<string> chunks, CancellationToken cancellationToken)
     {

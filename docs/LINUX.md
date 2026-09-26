@@ -20,7 +20,7 @@ dotnet run --project src/Linux/AiSelectionToolbar.Linux.csproj
 - 原生 Wayland 不允许普通应用读取其他程序的全局选区、指针与快捷键；本实现要求 X11，Wayland/XWayland 混合会话不作为支持目标。
 - X11 PRIMARY 由目标程序自行提供。无法选中文字的控件、扫描 PDF 和不公开 PRIMARY 的程序无法取词。工具栏位置以鼠标指针为锚点，不是文本的精确字形边界。
 - 某些桌面没有传统系统托盘区域，GTK StatusIcon 可由支持 StatusNotifier/AppIndicator 的桌面环境显示；其余环境可通过窗口或进程管理器退出。
-- CI 仅验证编译、打包和无 DISPLAY 的启动保护。需要在 Xorg 桌面上实测不同应用的划词、托盘、窗口定位与 API 结果。
+- CI 验证编译、打包、无 DISPLAY 的启动保护及 Xvfb 下的 GTK 启动。需要在 Xorg 桌面上实测不同应用的划词、托盘、窗口定位与 API 结果。
 
 Linux 端构建命令：
 

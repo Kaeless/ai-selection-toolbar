@@ -22,10 +22,12 @@ public sealed class LinuxWindow : IDisposable
     private readonly StatusIcon tray;
     private readonly Box toolbarButtons;
     private readonly TextView answerText;
+    private readonly Button noteButton = new("做笔记") { Sensitive = false };
     private readonly Entry endpoint = new();
     private readonly Entry model = new();
     private readonly Entry secret = new() { Visibility = false, PlaceholderText = "留空以保留当前地址的密钥" };
     private readonly Entry language = new();
+    private readonly Entry notesDirectory = new();
     private readonly Entry accent = new();
     private readonly Entry excluded = new();
     private readonly Entry historySearch = new();
@@ -68,7 +70,9 @@ public sealed class LinuxWindow : IDisposable
         var top = new Box(Orientation.Horizontal, 4);
         var close = new Button("×") { Relief = ReliefStyle.None };
         close.Clicked += (_, _) => { activeRequest?.Cancel(); answer.Hide(); };
+        noteButton.Clicked += (_, _) => SaveNote();
         top.PackStart(new Label(""), true, true, 0);
+        top.PackEnd(noteButton, false, false, 0);
         top.PackEnd(close, false, false, 0);
         answerBox.PackStart(top, false, false, 0);
         answerText = new TextView { Editable = false, WrapMode = WrapMode.WordChar, CursorVisible = false,
@@ -122,6 +126,7 @@ public sealed class LinuxWindow : IDisposable
         settingsPage.PackStart(Field("样式", style), false, false, 0);
         settingsPage.PackStart(Field("颜色 (#RRGGBB)", accent), false, false, 0);
         settingsPage.PackStart(Field("翻译目标语言", language), false, false, 0);
+        settingsPage.PackStart(Field("笔记目录", notesDirectory), false, false, 0);
         settingsPage.PackStart(Heading("排除的程序"), false, false, 0);
         settingsPage.PackStart(new Label("每行填写一个程序名。也可以点工具栏右侧的图标排除当前程序。") { Xalign = 0 }, false, false, 0);
         settingsPage.PackStart(Field("程序名", excluded), false, false, 0);
@@ -168,6 +173,7 @@ public sealed class LinuxWindow : IDisposable
         model.Text = current.Model ?? "";
         secret.Text = "";
         language.Text = current.TranslationTargetLanguage ?? "中文";
+        notesDirectory.Text = MarkdownNoteStore.ResolveDirectory(current.NotesDirectory);
         accent.Text = current.ToolbarAccentColor ?? "#4F46E5";
         style.ActiveId = current.ToolbarStyle == "compact" ? "compact" : "standard";
         autoShow.Active = current.AutoShow;
@@ -204,6 +210,7 @@ public sealed class LinuxWindow : IDisposable
             next.BaseUrl = newEndpoint;
             next.Model = model.Text.Trim();
             next.TranslationTargetLanguage = language.Text.Trim();
+            next.NotesDirectory = MarkdownNoteStore.ResolveDirectory(notesDirectory.Text);
             next.AutoShow = autoShow.Active;
             next.ToolbarStyle = style.ActiveId ?? "standard";
             next.ToolbarAccentColor = accent.Text.Trim();
@@ -238,7 +245,7 @@ public sealed class LinuxWindow : IDisposable
                 row.PackStart(new Label($"{item.CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm} · {item.Action} · {item.SourceApplication}") { Xalign = 0 }, false, false, 0);
                 row.PackStart(new Label(Shorten(item.SelectedText, 160)) { Xalign = 0, LineWrap = true }, false, false, 0);
                 var open = new Button("查看回答") { Halign = Align.Start };
-                open.Clicked += (_, _) => { renderedAnswer = item.Response ?? ""; RenderMarkdown(); answer.ShowAll(); answer.Present(); };
+                open.Clicked += (_, _) => { noteButton.Sensitive = false; renderedAnswer = item.Response ?? ""; RenderMarkdown(); answer.ShowAll(); answer.Present(); };
                 row.PackStart(open, false, false, 0);
                 historyRows.PackStart(row, false, false, 0);
             }
@@ -333,6 +340,7 @@ public sealed class LinuxWindow : IDisposable
         var selectionApp = selectedApp;
         var selectionTitle = selectedTitle;
         renderedAnswer = "";
+        noteButton.Sensitive = false;
         RenderMarkdown();
         answer.Move(popupX, popupY + 48);
         answer.ShowAll();
@@ -358,6 +366,8 @@ public sealed class LinuxWindow : IDisposable
                 if (request != activeRequest || request.IsCancellationRequested || disposed) return false;
                 lock (response) renderedAnswer = response.ToString();
                 RenderMarkdown();
+                noteButton.Sensitive = (action == "explain" || action == "explain_detailed") &&
+                    !string.IsNullOrWhiteSpace(renderedAnswer);
                 try
                 {
                     host.SaveHistory(new HistoryEntry {
@@ -382,6 +392,29 @@ public sealed class LinuxWindow : IDisposable
                 return false;
             });
         }
+    }
+
+    private void SaveNote()
+    {
+        if (string.IsNullOrWhiteSpace(selectedText) || !noteButton.Sensitive) return;
+        using var dialog = new Dialog("编辑学习笔记", management, DialogFlags.Modal);
+        var editor = new TextView { WrapMode = WrapMode.WordChar };
+        editor.Buffer.Text = renderedAnswer;
+        var scroll = new ScrolledWindow { WidthRequest = 520, HeightRequest = 350 };
+        scroll.Add(editor);
+        dialog.ContentArea.PackStart(scroll, true, true, 12);
+        dialog.AddButton("取消", ResponseType.Cancel);
+        dialog.AddButton("保存", ResponseType.Ok);
+        dialog.ShowAll();
+        if ((ResponseType)dialog.Run() != ResponseType.Ok) return;
+        try
+        {
+            var path = host.SaveNote(selectedText, editor.Buffer.Text.Trim(), selectedApp, selectedTitle);
+            RefreshHistory();
+            noteButton.Sensitive = false;
+            Message("笔记已保存到：" + path, MessageType.Info);
+        }
+        catch (Exception ex) { Message(ex.Message, MessageType.Error); }
     }
 
     private sealed class ImmediateProgress<T>(Action<T> report) : IProgress<T>

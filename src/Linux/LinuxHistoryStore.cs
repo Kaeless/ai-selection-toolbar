@@ -71,5 +71,17 @@ internal sealed class LinuxHistoryStore : IDisposable
         }
     }
 
+    public bool HasNote(string selectedText, string response)
+    {
+        lock (gate)
+        {
+            using var command = db.CreateCommand();
+            command.CommandText = "SELECT 1 FROM history WHERE action = 'note' AND selected_text = $text AND response = $response LIMIT 1";
+            command.Parameters.AddWithValue("$text", selectedText);
+            command.Parameters.AddWithValue("$response", response);
+            return command.ExecuteScalar() != null;
+        }
+    }
+
     public void Dispose() => db.Dispose();
 }

@@ -16,7 +16,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Install GTK and X11 test dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 xclip xvfb
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 xclip xvfb xauth
       - name: Restore and build
         run: dotnet build src/Linux/AiSelectionToolbar.Linux.csproj -c Release --nologo
       - name: Publish portable Linux binary
@@ -28,6 +28,13 @@ jobs:
           result=$?
           cat /tmp/linux-startup.out
           test "$result" -eq 2
+      - name: Smoke test GTK startup under Xvfb
+        run: |
+          set +e
+          timeout 8s xvfb-run -a env XDG_SESSION_TYPE=x11 dist/linux-x64/AiSelectionToolbar.Linux > /tmp/linux-gtk.out 2>&1
+          result=$?
+          cat /tmp/linux-gtk.out
+          test "$result" -eq 124
       - name: Package artifact
         run: tar -C dist/linux-x64 -czf dist/AISelectionToolbar-linux-x64.tar.gz .
       - uses: actions/upload-artifact@v4
