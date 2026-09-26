@@ -23,6 +23,8 @@ namespace AiSelectionToolbar.Desktop
         private readonly Action<string> _addExclusion;
         private readonly Action<string> _removeExclusion;
         private readonly Action<ApiConnectionInput> _saveApiConnection;
+        private readonly Action<string> _selectApiConnection;
+        private readonly Action<string> _deleteApiConnection;
         private readonly Action<long> _deleteHistory;
         private readonly Action _clearHistory;
         private readonly string _token;
@@ -35,7 +37,8 @@ namespace AiSelectionToolbar.Desktop
 
         public LocalManagementServer(Func<DesktopSettings> getSettings, Action<DesktopSettings> setSettings,
             Func<string, int, HistoryItem[]> getHistory, Action<string> addExclusion, Action<string> removeExclusion,
-            Action<ApiConnectionInput> saveApiConnection, Action<long> deleteHistory, Action clearHistory)
+            Action<ApiConnectionInput> saveApiConnection, Action<string> selectApiConnection,
+            Action<string> deleteApiConnection, Action<long> deleteHistory, Action clearHistory)
         {
             _getSettings = getSettings;
             _setSettings = setSettings;
@@ -43,6 +46,8 @@ namespace AiSelectionToolbar.Desktop
             _addExclusion = addExclusion;
             _removeExclusion = removeExclusion;
             _saveApiConnection = saveApiConnection;
+            _selectApiConnection = selectApiConnection;
+            _deleteApiConnection = deleteApiConnection;
             _deleteHistory = deleteHistory;
             _clearHistory = clearHistory;
             var bytes = new byte[32];
@@ -167,6 +172,7 @@ namespace AiSelectionToolbar.Desktop
                             var input = serializer.Deserialize<ApiConnectionInput>(json);
                             Uri uri;
                             if (input == null || input.ApiKey == null || input.ApiKey.Length > 8192 ||
+                                string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 80 ||
                                 input.Model == null || input.Model.Length > 200 ||
                                 input.ApiBaseUrl == null || input.ApiBaseUrl.Length > 2048 ||
                                 !Uri.TryCreate(input.ApiBaseUrl, UriKind.Absolute, out uri) ||
@@ -174,6 +180,16 @@ namespace AiSelectionToolbar.Desktop
                                  (uri.Scheme != Uri.UriSchemeHttp || !uri.IsLoopback)))
                                 throw new ArgumentException("Invalid connection");
                             _saveApiConnection(input);
+                        }
+                        else if (path == "/api/connection/select" || path == "/api/connection/delete")
+                        {
+                            var input = serializer.Deserialize<Dictionary<string, string>>(json);
+                            string id;
+                            if (input == null || !input.TryGetValue("id", out id) ||
+                                string.IsNullOrWhiteSpace(id) || id.Length > 64)
+                                throw new ArgumentException("Invalid connection id");
+                            if (path.EndsWith("select", StringComparison.Ordinal)) _selectApiConnection(id);
+                            else _deleteApiConnection(id);
                         }
                         else if (path == "/api/exclusions/add" || path == "/api/exclusions/remove")
                         {

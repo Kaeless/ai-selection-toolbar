@@ -9,3 +9,10 @@ TestResults/
 *.sqlite
 *.sqlite3
 notes/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+*.spec

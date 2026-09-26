@@ -21,23 +21,28 @@
       <div class="sidebar-bottom"><span class="local-dot"></span>仅在本机运行<br><small>设置与历史保存在当前用户环境</small></div>
     </aside>
     <main class="main">
-      <header class="page-header"><div><p class="eyebrow">AI SELECTION TOOLBAR</p><h1 id="pageTitle">常规设置</h1><p id="pageSubtitle">让划词后的下一步更顺手。</p></div><span class="version">v0.3.2</span></header>
+      <header class="page-header"><div><p class="eyebrow">AI SELECTION TOOLBAR</p><h1 id="pageTitle">常规设置</h1><p id="pageSubtitle">让划词后的下一步更顺手。</p></div><span class="version">v0.4.0</span></header>
       <div class="content">
         <section id="settingsPanel" class="panel">
           <div class="section-head"><h2>使用偏好</h2><p>调整浮窗、翻译语言与本机笔记位置。</p></div>
           <div class="card">
             <label class="switch-row" for="autoShow"><span><strong>选中文字后显示工具栏</strong><small>在支持取词的程序中自动显示</small></span><input id="autoShow" type="checkbox"></label>
-            <label class="switch-row" for="startOnLogin"><span><strong>登录 Windows 后自动启动</strong><small>仅当前用户；移动便携版后请手动运行一次以更新路径</small></span><input id="startOnLogin" type="checkbox"></label>
+            <label class="switch-row" for="startOnLogin"><span><strong>登录系统后自动启动</strong><small>仅当前用户；移动便携版后请手动运行一次以更新路径</small></span><input id="startOnLogin" type="checkbox"></label>
             <div class="field"><label for="language">翻译目标语言</label><input id="language" maxlength="50" placeholder="中文"></div>
             <div class="field"><label for="notesDirectory">笔记保存目录</label><input id="notesDirectory" maxlength="2048" placeholder="C:\Users\...\Documents\AiSelectionToolbar\Notes"><small>输入绝对路径；新笔记会立即保存到这个目录。</small></div>
             <div class="actions"><button id="saveSettings" class="primary" type="button">保存设置</button></div>
           </div>
-          <div class="section-head second"><h2>模型连接</h2><p>使用兼容 Chat Completions 的服务。密钥只保存在本机，不在页面回显。</p></div>
-          <div class="card">
+          <div class="section-head second"><h2>API 连接</h2><p>可保存多个兼容 Chat Completions 的接口，并选择工具栏当前使用的连接。</p></div>
+          <div id="apiProfileList" class="api-profile-list"></div>
+          <div class="card api-editor">
+            <div class="editor-head"><div><strong id="apiEditorTitle">新增 API</strong><small>密钥只保存在本机，不在页面回显。</small></div><button id="newConnection" class="secondary" type="button">新增</button></div>
+            <input id="apiId" type="hidden">
+            <div class="field"><label for="apiName">配置名称</label><input id="apiName" maxlength="80" placeholder="例如：DeepSeek、公司网关、本地 Ollama"></div>
             <div class="field"><label for="apiBaseUrl">API 地址</label><input id="apiBaseUrl" type="url" maxlength="2048" placeholder="https://example.com/v1"><small>远程地址须使用 HTTPS；本机地址可以使用 HTTP。</small></div>
             <div class="field"><label for="model">模型名称</label><input id="model" maxlength="200" placeholder="模型标识"></div>
             <div class="field"><label for="apiKey">API key</label><input id="apiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="仅提交，不回显"><small>同一地址留空保留原密钥；更换地址时留空会清除原密钥。</small></div>
-            <div class="actions"><button id="saveConnection" class="primary" type="button">保存连接</button></div>
+            <label class="switch-row compact-switch" for="makeActive"><span><strong>保存后设为当前 API</strong><small>下一次请求会立即使用这个接口</small></span><input id="makeActive" type="checkbox" checked></label>
+            <div class="actions"><button id="saveConnection" class="primary" type="button">保存 API</button></div>
           </div>
         </section>
 
@@ -70,7 +75,7 @@
         <section id="exclusionsPanel" class="panel" hidden>
           <div class="section-head"><h2>排除程序</h2><p>不在这些程序中读取选中文字。浮窗里也可一键隐藏当前程序。</p></div>
           <div class="card">
-            <div class="file-picker"><span><strong>选择 Windows 程序</strong><small>只读取 .exe 文件名，不上传文件内容。</small></span><button id="chooseExe" class="secondary" type="button">选择 EXE</button><input id="exeFile" type="file" accept=".exe,application/x-msdownload" hidden></div>
+            <div class="file-picker"><span><strong>选择程序</strong><small>只读取文件名，不上传文件内容。</small></span><button id="chooseExe" class="secondary" type="button">选择程序</button><input id="exeFile" type="file" hidden></div>
             <ul id="excludedList"></ul>
           </div>
         </section>

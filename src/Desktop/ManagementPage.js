@@ -5,6 +5,8 @@ history.replaceState(null, "", location.pathname);
 const byId = id => document.getElementById(id);
 const status = message => { byId("status").textContent = message; };
 let customActions = [];
+let apiProfiles = [];
+let activeApiId = "";
 let historyOffset = 0;
 let historyRequest = 0;
 
@@ -55,7 +57,7 @@ async function loadExclusions() { renderExclusions((await api("/api/settings")).
 function updatePreview() {
   const color = byId("toolbarColor").value.toUpperCase();
   byId("colorValue").textContent = color;
-  document.documentElement.style.setProperty("--accent", color);
+  document.documentElement.style.setProperty("--toolbar-accent", color);
   const preview = byId("toolbarPreview");
   preview.classList.toggle("compact", byId("toolbarStyle").value === "compact");
   while (preview.children.length > 5) preview.lastElementChild.remove();
@@ -93,15 +95,65 @@ function renderCustomActions() {
   updatePreview();
 }
 
+function editApi(profile) {
+  byId("apiEditorTitle").textContent = profile ? "编辑 API" : "新增 API";
+  byId("apiId").value = profile?.Id || "";
+  byId("apiName").value = profile?.Name || "";
+  byId("apiBaseUrl").value = profile?.ApiBaseUrl || "";
+  byId("model").value = profile?.Model || "";
+  byId("apiKey").value = "";
+  byId("apiKey").placeholder = profile?.HasApiKey ? "已保存密钥，留空保持不变" : "可留空用于本地接口";
+  byId("makeActive").checked = !profile || profile.Id === activeApiId;
+  byId("apiName").focus();
+}
+
+function renderApiProfiles() {
+  const list = byId("apiProfileList"); list.replaceChildren();
+  if (!apiProfiles.length) {
+    const empty = document.createElement("div"); empty.className = "card empty";
+    empty.textContent = "尚未配置 API。添加后即可在这里切换当前连接。"; list.append(empty); return;
+  }
+  for (const profile of apiProfiles) {
+    const card = document.createElement("article"); card.className = "api-profile";
+    if (profile.Id === activeApiId) card.classList.add("active");
+    const main = document.createElement("div"); main.className = "api-profile-main";
+    const title = document.createElement("strong"); title.textContent = profile.Name || "未命名 API";
+    const detail = document.createElement("small");
+    detail.textContent = (profile.Model || "未填写模型") + " · " + (profile.ApiBaseUrl || "未填写地址");
+    main.append(title, detail);
+    const actions = document.createElement("div"); actions.className = "api-profile-actions";
+    if (profile.Id === activeApiId) {
+      const badge = document.createElement("span"); badge.className = "active-badge"; badge.textContent = "当前使用"; actions.append(badge);
+    } else {
+      const select = document.createElement("button"); select.type = "button"; select.className = "secondary"; select.textContent = "设为当前";
+      select.addEventListener("click", () => run(async () => {
+        await api("/api/connection/select", "POST", {id: profile.Id});
+        await loadSettings(); status("已切换到 " + profile.Name);
+      })); actions.append(select);
+    }
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "secondary"; edit.textContent = "编辑";
+    edit.addEventListener("click", () => editApi(profile)); actions.append(edit);
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger-quiet"; remove.textContent = "删除";
+    remove.disabled = apiProfiles.length <= 1;
+    remove.addEventListener("click", () => run(async () => {
+      if (!confirm("删除 API 配置“" + profile.Name + "”？")) return;
+      await api("/api/connection/delete", "POST", {id: profile.Id}); await loadSettings(); status("API 配置已删除");
+    })); actions.append(remove);
+    card.append(main, actions); list.append(card);
+  }
+}
+
 async function loadSettings() {
   const value = await api("/api/settings");
   byId("autoShow").checked = !!value.AutoShow;
   byId("startOnLogin").checked = !!value.StartOnLogin;
   byId("language").value = value.TargetLanguage || "";
   byId("notesDirectory").value = value.NotesDirectory || "";
-  byId("apiBaseUrl").value = value.ApiBaseUrl || "";
-  byId("model").value = value.Model || "";
-  byId("apiKey").value = "";
+  apiProfiles = value.ApiProfiles || [];
+  activeApiId = value.ActiveApiId || "";
+  renderApiProfiles();
+  const editingId = byId("apiId").value;
+  editApi(apiProfiles.find(x => x.Id === editingId) || apiProfiles.find(x => x.Id === activeApiId) || null);
   byId("toolbarStyle").value = value.ToolbarStyle === "compact" ? "compact" : "standard";
   byId("toolbarColor").value = /^#[0-9a-f]{6}$/i.test(value.ToolbarAccentColor || "") ? value.ToolbarAccentColor : "#4F46E5";
   customActions = (value.CustomActions || []).map(x => ({Id: x.Id || "", Name: x.Name || "", Prompt: x.Prompt || ""}));
@@ -185,17 +237,20 @@ byId("addCustomAction").addEventListener("click", () => {
   if (customActions.length >= 8) return;
   customActions.push({Id: "", Name: "", Prompt: ""}); renderCustomActions();
 });
+byId("newConnection").addEventListener("click", () => editApi(null));
 byId("saveConnection").addEventListener("click", () => run(async () => {
-  await api("/api/connection", "POST", {ApiBaseUrl: byId("apiBaseUrl").value.trim(),
-    Model: byId("model").value.trim(), ApiKey: byId("apiKey").value});
-  byId("apiKey").value = ""; status("连接配置已保存");
+  const name = byId("apiName").value.trim();
+  if (!name) throw new Error("请填写配置名称");
+  await api("/api/connection", "POST", {Id: byId("apiId").value, Name: name,
+    ApiBaseUrl: byId("apiBaseUrl").value.trim(), Model: byId("model").value.trim(),
+    ApiKey: byId("apiKey").value, MakeActive: byId("makeActive").checked});
+  await loadSettings(); status("API 配置已保存");
 }));
 byId("chooseExe").addEventListener("click", () => byId("exeFile").click());
 byId("exeFile").addEventListener("change", event => run(async () => {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
-    if (!/\.exe$/i.test(file.name)) throw new Error("请选择 .exe 程序文件");
     await api("/api/exclusions/add", "POST", {application: file.name});
     await loadExclusions(); status("已排除 " + file.name);
   } finally { event.target.value = ""; }

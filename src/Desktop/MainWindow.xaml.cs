@@ -49,6 +49,8 @@ namespace AiSelectionToolbar.Desktop
         public Func<DesktopSettings> LoadSettings { get; set; }
         public Action<DesktopSettings> SaveSettings { get; set; }
         public Action<ApiConnectionInput> SaveApiConnection { get; set; }
+        public Action<string> SelectApiConnection { get; set; }
+        public Action<string> DeleteApiConnection { get; set; }
         public Action<string, string, string, string> SaveNote { get; set; }
         public Func<string, string, bool> IsDuplicateNote { get; set; }
 
@@ -224,6 +226,8 @@ namespace AiSelectionToolbar.Desktop
             Top = Math.Max(0, SystemParameters.WorkArea.Bottom - Height - 24);
             _server = new LocalManagementServer(GetSettings, UpdateSettings, GetHistory,
                 AddExclusion, RemoveExclusion, UpdateApiConnection,
+                id => { if (SelectApiConnection != null) SelectApiConnection(id); },
+                id => { if (DeleteApiConnection != null) DeleteApiConnection(id); },
                 id => { if (DeleteHistoryItem != null) DeleteHistoryItem(id); },
                 () => { if (ClearHistoryItems != null) ClearHistoryItems(); });
             try { _server.Start(); }
@@ -699,6 +703,8 @@ namespace AiSelectionToolbar.Desktop
                     AutoShow = external.AutoShow, TargetLanguage = external.TargetLanguage,
                     StartOnLogin = external.StartOnLogin, NotesDirectory = external.NotesDirectory,
                     ApiBaseUrl = external.ApiBaseUrl, Model = external.Model,
+                    ActiveApiId = external.ActiveApiId,
+                    ApiProfiles = new List<ApiProfileSummary>(external.ApiProfiles ?? new List<ApiProfileSummary>()),
                     CustomActions = new List<CustomActionDefinition>(external.CustomActions ?? new List<CustomActionDefinition>()),
                     ToolbarStyle = external.ToolbarStyle, ToolbarAccentColor = external.ToolbarAccentColor,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
@@ -707,6 +713,8 @@ namespace AiSelectionToolbar.Desktop
                 TargetLanguage = _settings.TargetLanguage,
                 StartOnLogin = _settings.StartOnLogin, NotesDirectory = _settings.NotesDirectory,
                 ApiBaseUrl = _settings.ApiBaseUrl, Model = _settings.Model,
+                ActiveApiId = _settings.ActiveApiId,
+                ApiProfiles = new List<ApiProfileSummary>(_settings.ApiProfiles ?? new List<ApiProfileSummary>()),
                 CustomActions = new List<CustomActionDefinition>(_settings.CustomActions ?? new List<CustomActionDefinition>()),
                 ToolbarStyle = _settings.ToolbarStyle, ToolbarAccentColor = _settings.ToolbarAccentColor,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };

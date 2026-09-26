@@ -12,15 +12,30 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-python@v5
         with:
-          dotnet-version: 8.0.x
-      - name: Install GTK and X11 test dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 xclip xvfb xauth
-      - name: Restore and build
-        run: dotnet build src/Linux/AiSelectionToolbar.Linux.csproj -c Release --nologo
-      - name: Publish portable Linux binary
-        run: dotnet publish src/Linux/AiSelectionToolbar.Linux.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/linux-x64
+          python-version: '3.12'
+      - name: Install Qt, X11 and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-6 libxcb-cursor0 xclip xvfb xauth
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[build]'
+      - name: Run Linux unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m unittest tests/test_linux_settings.py tests/test_linux_position.py tests/test_linux_history.py
+      - name: Build portable PySide6 executable
+        run: |
+          pyinstaller --noconfirm --clean --onefile --name AiSelectionToolbar.Linux \
+            --paths src/Linux --collect-all keyring \
+            --add-data 'src/Desktop/ManagementPage.html:web' \
+            --add-data 'src/Desktop/ManagementPage.css:web' \
+            --add-data 'src/Desktop/ManagementPage.js:web' \
+            --add-data 'src/Desktop/Assets/AppIcon.svg:.' \
+            src/Linux/launcher.py
+          mkdir -p dist/linux-x64
+          mv dist/AiSelectionToolbar.Linux dist/linux-x64/
       - name: Check startup guard without X11
         run: |
           set +e
@@ -28,7 +43,7 @@ jobs:
           result=$?
           cat /tmp/linux-startup.out
           test "$result" -eq 2
-      - name: Smoke test GTK startup under Xvfb
+      - name: Smoke test PySide6 startup under Xvfb
         run: |
           set +e
           timeout 8s xvfb-run -a env XDG_SESSION_TYPE=x11 dist/linux-x64/AiSelectionToolbar.Linux > /tmp/linux-gtk.out 2>&1

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-selection-toolbar"
+version = "0.4.0"
+description = "Linux X11 selection toolbar implemented with PySide6"
+requires-python = ">=3.10"
+dependencies = [
+  "PySide6>=6.7,<6.10",
+  "keyring>=25,<26",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.10,<7"]
+
+[project.scripts]
+ai-selection-toolbar = "ai_selection_toolbar.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src/Linux"}
+
+[tool.setuptools.packages.find]
+where = ["src/Linux"]
+include = ["ai_selection_toolbar*"]

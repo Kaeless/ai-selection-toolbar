@@ -77,6 +77,8 @@ namespace AiSelectionToolbar.Desktop
         public string NotesDirectory { get; set; } = "";
         public string ApiBaseUrl { get; set; } = "";
         public string Model { get; set; } = "";
+        public string ActiveApiId { get; set; } = "";
+        public List<ApiProfileSummary> ApiProfiles { get; set; } = new List<ApiProfileSummary>();
         public List<string> ExcludedApplications { get; set; } = new List<string>();
         public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
         public string ToolbarStyle { get; set; } = "standard";
@@ -85,9 +87,21 @@ namespace AiSelectionToolbar.Desktop
 
     public sealed class ApiConnectionInput
     {
+        public string Id { get; set; }
+        public string Name { get; set; }
         public string ApiBaseUrl { get; set; }
         public string Model { get; set; }
         public string ApiKey { get; set; }
+        public bool MakeActive { get; set; }
+    }
+
+    public sealed class ApiProfileSummary
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string ApiBaseUrl { get; set; }
+        public string Model { get; set; }
+        public bool HasApiKey { get; set; }
     }
 
     public sealed class HistoryItem
