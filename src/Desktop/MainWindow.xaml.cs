@@ -117,7 +117,7 @@ namespace AiSelectionToolbar.Desktop
                 }
             }
             var compact = string.Equals(settings.ToolbarStyle, "compact", StringComparison.Ordinal);
-            QuickButtonStrip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            QuickButtonStrip.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
             var chrome = QuickScroll.Padding.Left + QuickScroll.Padding.Right +
                 QuickPanel.BorderThickness.Left + QuickPanel.BorderThickness.Right +
                 QuickPanel.Margin.Left + QuickPanel.Margin.Right + 2;
@@ -421,7 +421,7 @@ namespace AiSelectionToolbar.Desktop
         {
             var markdown = _rawResult.ToString();
             var document = new FlowDocument {
-                FontFamily = new FontFamily("Segoe UI, Microsoft YaHei"), FontSize = 14,
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei"), FontSize = 14,
                 PagePadding = new Thickness(9), ColumnWidth = 1000
             };
             if (markdown.Length == 0)
@@ -507,7 +507,7 @@ namespace AiSelectionToolbar.Desktop
         private static void AddCodeBlock(FlowDocument document, string content)
         {
             document.Blocks.Add(new Paragraph(new Run(content.TrimEnd('\n'))) {
-                FontFamily = new FontFamily("Consolas"), FontSize = 12.5,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 12.5,
                 Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(234, 238, 246)),
                 Padding = new Thickness(10), Margin = new Thickness(0, 6, 0, 11) });
         }
@@ -537,7 +537,7 @@ namespace AiSelectionToolbar.Desktop
                         var content = new Run(source.Substring(index + 1, end - index - 1));
                         if (marker == '*') target.Add(new Italic(content));
                         else target.Add(new Span(content) {
-                            FontFamily = new FontFamily("Consolas"),
+                            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
                             Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(234, 238, 246)) });
                         index = end + 1; continue;
                     }
