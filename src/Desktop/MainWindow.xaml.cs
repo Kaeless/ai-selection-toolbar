@@ -707,6 +707,7 @@ namespace AiSelectionToolbar.Desktop
                     ApiProfiles = new List<ApiProfileSummary>(external.ApiProfiles ?? new List<ApiProfileSummary>()),
                     CustomActions = new List<CustomActionDefinition>(external.CustomActions ?? new List<CustomActionDefinition>()),
                     ToolbarStyle = external.ToolbarStyle, ToolbarAccentColor = external.ToolbarAccentColor,
+                    AnswerBackgroundColor = external.AnswerBackgroundColor,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
             }
             lock (_stateLock) return new DesktopSettings { AutoShow = _settings.AutoShow,
@@ -717,6 +718,7 @@ namespace AiSelectionToolbar.Desktop
                 ApiProfiles = new List<ApiProfileSummary>(_settings.ApiProfiles ?? new List<ApiProfileSummary>()),
                 CustomActions = new List<CustomActionDefinition>(_settings.CustomActions ?? new List<CustomActionDefinition>()),
                 ToolbarStyle = _settings.ToolbarStyle, ToolbarAccentColor = _settings.ToolbarAccentColor,
+                AnswerBackgroundColor = _settings.AnswerBackgroundColor,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };
         }
 
@@ -730,6 +732,7 @@ namespace AiSelectionToolbar.Desktop
             current.CustomActions = value.CustomActions ?? new List<CustomActionDefinition>();
             current.ToolbarStyle = value.ToolbarStyle;
             current.ToolbarAccentColor = value.ToolbarAccentColor;
+            current.AnswerBackgroundColor = value.AnswerBackgroundColor;
             PersistSettings(current);
         }
 

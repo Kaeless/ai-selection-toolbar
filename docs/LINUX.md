@@ -14,7 +14,7 @@ python -m pip install -e .
 ai-selection-toolbar
 ```
 
-发布的 `linux-x64` 压缩包已包含 Python 与 Qt 运行时，但仍依赖 X11 和 `xclip`。登录时选择 Xorg 会话。解压 CI 工件后运行 `./install.sh`，再从应用菜单启动；也可以直接运行 `./AiSelectionToolbar.Linux`。首次启动会打开浏览器管理页；后续可从托盘进入，或用 `AiSelectionToolbar.Linux --settings` 打开。运行 `./uninstall.sh` 可卸载程序，设置和历史仍保留。
+发布的 Linux 安装包包含 Python 与 Qt 运行时，但仍依赖 X11 和 `xclip`。登录时选择 Xorg 会话。优先使用可执行安装包 `AISelectionToolbar-linux-x64.run`：下载后直接运行即可，无需手动解压；它会注册应用菜单项。压缩包仍作为备用方式，解压后运行 `./install.sh`。也可以直接运行 `./AiSelectionToolbar.Linux`。首次启动会打开浏览器管理页；后续可从托盘进入，或用 `AiSelectionToolbar.Linux --settings` 打开。运行 `./uninstall.sh` 可卸载程序，设置和历史仍保留。
 
 设置存于 `${XDG_CONFIG_HOME:-~/.config}/ai-selection-toolbar/settings.json`。API 密钥通过系统 keyring（Secret Service）保存，不写入 JSON；Windows 继续使用 DPAPI，因此两个平台可共用配置字段，但密钥需要分别录入。历史存于 `${XDG_DATA_HOME:-~/.local/share}/ai-selection-toolbar/history.db`。联网只发生在用户点击 AI 操作后；云端地址必须为 HTTPS，本机回环可用 HTTP。
 

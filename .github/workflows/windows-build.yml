@@ -32,7 +32,7 @@ jobs:
           if (!(Test-Path "$release/x64/SQLite.Interop.dll")) { throw 'SQLite x64 native library missing' }
           if (!(Test-Path "$release/System.Data.SQLite.dll")) { throw 'SQLite managed library missing' }
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Compress-Archive -Path "$release/*" -DestinationPath 'dist/AISelectionToolbar-0.3.2-win-x64-portable.zip' -Force
+          Compress-Archive -Path "$release/*" -DestinationPath 'dist/AISelectionToolbar-0.5.0-win-x64-portable.zip' -Force
       - name: Package installer
         shell: pwsh
         run: |
@@ -64,6 +64,6 @@ jobs:
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
-          name: AISelectionToolbar-0.3.2-win-x64-setup
-          path: dist/AISelectionToolbar-0.3.2-win-x64-setup.exe
+          name: AISelectionToolbar-0.5.0-win-x64-setup
+          path: dist/AISelectionToolbar-0.5.0-win-x64-setup.exe
           if-no-files-found: error

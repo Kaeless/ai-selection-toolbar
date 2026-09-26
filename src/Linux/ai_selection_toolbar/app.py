@@ -36,6 +36,8 @@ class ApplicationController:
         self.toolbar = Toolbar()
         self.answer = AnswerWindow()
         self.toolbar.rebuild(self.settings)
+        self.answer.set_accent(self.settings.get("ToolbarAccentColor", "#4F46E5"))
+        self.answer.set_background(self.settings.get("AnswerBackgroundColor", "#F8FAFC"))
         self.toolbar.action_requested.connect(self.run_action)
         self.toolbar.exclude_requested.connect(self.exclude_current)
         self.answer.stop_button.clicked.connect(self.cancel_request)
@@ -45,6 +47,7 @@ class ApplicationController:
         self.management.start()
         self.watcher = SelectionWatcher(self.settings.get("ExcludedApplications", []))
         self.watcher.selection_captured.connect(self.show_selection)
+        self.watcher.selection_cleared.connect(self.clear_selection)
         self.watcher.failed.connect(self.show_error)
         self.tray = self._create_tray()
         self._apply_autostart()
@@ -86,8 +89,19 @@ class ApplicationController:
         self.anchor = QCursor.pos()
         if self.anchor.isNull():
             self.anchor = QPoint(x, y)
-        self.answer.hide()
+        if not self.answer.is_pinned:
+            self.answer.hide()
         self.toolbar.show_below(self.anchor)
+
+    def clear_selection(self, _x: int, _y: int) -> None:
+        """Hide stale controls when the user starts another mouse interaction."""
+        cursor = QCursor.pos()
+        if self.toolbar.isVisible() and self.toolbar.geometry().contains(cursor):
+            return
+        self.selection_text = ""
+        self.selection_app = ""
+        self.selection_title = ""
+        self.toolbar.hide()
 
     def run_action(self, action: str) -> None:
         if not self.selection_text:
@@ -143,6 +157,8 @@ class ApplicationController:
     def reload_settings(self) -> None:
         self.settings = self.store.load()
         self.toolbar.rebuild(self.settings)
+        self.answer.set_accent(self.settings.get("ToolbarAccentColor", "#4F46E5"))
+        self.answer.set_background(self.settings.get("AnswerBackgroundColor", "#F8FAFC"))
         self.watcher.update_excluded(self.settings.get("ExcludedApplications", []))
         self._apply_autostart()
 

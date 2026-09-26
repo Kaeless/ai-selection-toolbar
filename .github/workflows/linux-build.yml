@@ -56,8 +56,12 @@ jobs:
           cp packaging/linux/install.sh packaging/linux/uninstall.sh dist/linux-x64/
           chmod +x dist/linux-x64/install.sh dist/linux-x64/uninstall.sh
           tar -C dist/linux-x64 -czf dist/AISelectionToolbar-linux-x64.tar.gz .
+          chmod +x packaging/linux/make-installer.sh
+          packaging/linux/make-installer.sh dist/linux-x64 dist/AISelectionToolbar-linux-x64.run
       - uses: actions/upload-artifact@v4
         with:
           name: AISelectionToolbar-linux-x64
-          path: dist/AISelectionToolbar-linux-x64.tar.gz
+          path: |
+            dist/AISelectionToolbar-linux-x64.tar.gz
+            dist/AISelectionToolbar-linux-x64.run
           if-no-files-found: error

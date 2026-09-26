@@ -16,6 +16,7 @@ class XClassHint(Structure):
 
 class SelectionWatcher(QThread):
     selection_captured = Signal(str, str, str, int, int)
+    selection_cleared = Signal(int, int)
     failed = Signal(str)
 
     def __init__(self, excluded: list[str] | None = None) -> None:
@@ -62,6 +63,7 @@ class SelectionWatcher(QThread):
                         pressed = bool(mask.value & BUTTON1_MASK)
                         if pressed and not pressed_before:
                             down_x, down_y = root_x.value, root_y.value
+                            self.selection_cleared.emit(root_x.value, root_y.value)
                         if (not pressed and pressed_before and
                                 (abs(root_x.value - down_x) > 5 or abs(root_y.value - down_y) > 5)):
                             time.sleep(0.07)

@@ -73,6 +73,11 @@ class SettingsStoreTests(unittest.TestCase):
         with self.assertRaises(SettingsError):
             self.store.delete_profile(profile_id)
 
+    def test_public_settings_contains_app_metadata(self) -> None:
+        public = self.store.public_settings()
+        self.assertEqual("0.5.0", public["Version"])
+        self.assertEqual("Kaeless", public["Author"])
+
 
 if __name__ == "__main__":
     unittest.main()

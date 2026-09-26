@@ -71,6 +71,8 @@ namespace AiSelectionToolbar.Desktop
 
     public sealed class DesktopSettings
     {
+        public string Version { get; set; } = "0.5.0";
+        public string Author { get; set; } = "Kaeless";
         public bool AutoShow { get; set; } = true;
         public bool StartOnLogin { get; set; }
         public string TargetLanguage { get; set; } = "中文";
@@ -83,6 +85,7 @@ namespace AiSelectionToolbar.Desktop
         public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
         public string ToolbarStyle { get; set; } = "standard";
         public string ToolbarAccentColor { get; set; } = "#4F46E5";
+        public string AnswerBackgroundColor { get; set; } = "#F8FAFC";
     }
 
     public sealed class ApiConnectionInput

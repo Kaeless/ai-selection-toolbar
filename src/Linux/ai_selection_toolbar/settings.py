@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 import keyring
 
+from . import __author__, __version__
+
 SERVICE_NAME = "ai-selection-toolbar"
 DEFAULTS: dict[str, Any] = {
     "TimeoutSeconds": 120,
@@ -22,6 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "CustomActions": [],
     "ToolbarStyle": "standard",
     "ToolbarAccentColor": "#4F46E5",
+    "AnswerBackgroundColor": "#F8FAFC",
     "ApiProfiles": [],
     "ActiveApiId": "",
 }
@@ -155,6 +158,8 @@ class SettingsStore:
             for profile in settings["ApiProfiles"]
         ]
         result["Platform"] = "Linux"
+        result["Version"] = __version__
+        result["Author"] = __author__
         result.pop("ProtectedApiKey", None)
         return result
 

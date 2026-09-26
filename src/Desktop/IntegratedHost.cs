@@ -148,6 +148,7 @@ namespace AiSelectionToolbar.Desktop
         private DesktopSettings GetDesktopSettings()
         {
             lock (gate) return new DesktopSettings {
+                Version = "0.5.0", Author = "Kaeless",
                 AutoShow = settings.AutoShow, TargetLanguage = settings.TranslationTargetLanguage,
                 StartOnLogin = settings.StartOnLogin && StartupRegistration.IsEnabledForCurrentExecutable(),
                 NotesDirectory = MarkdownNoteStore.ResolveDirectory(settings.NotesDirectory),
@@ -157,7 +158,8 @@ namespace AiSelectionToolbar.Desktop
                 ExcludedApplications = new List<string>(settings.ExcludedApplications ?? new List<string>()),
                 CustomActions = CopyActions(settings.CustomActions),
                 ToolbarStyle = settings.ToolbarStyle ?? "standard",
-                ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5"
+                ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5",
+                AnswerBackgroundColor = settings.AnswerBackgroundColor ?? "#F8FAFC"
             };
         }
 
@@ -172,6 +174,9 @@ namespace AiSelectionToolbar.Desktop
                 if (value.ToolbarAccentColor == null ||
                     !Regex.IsMatch(value.ToolbarAccentColor, @"^#[0-9a-fA-F]{6}$"))
                     throw new ArgumentException("工具栏颜色应为 #RRGGBB。", nameof(value));
+                if (value.AnswerBackgroundColor == null ||
+                    !Regex.IsMatch(value.AnswerBackgroundColor, @"^#[0-9a-fA-F]{6}$"))
+                    throw new ArgumentException("回答框颜色应为 #RRGGBB。", nameof(value));
                 var updated = Clone(settings);
                 updated.AutoShow = value.AutoShow;
                 updated.StartOnLogin = value.StartOnLogin;
@@ -181,6 +186,7 @@ namespace AiSelectionToolbar.Desktop
                 updated.CustomActions = customActions;
                 updated.ToolbarStyle = value.ToolbarStyle;
                 updated.ToolbarAccentColor = value.ToolbarAccentColor.ToUpperInvariant();
+                updated.AnswerBackgroundColor = value.AnswerBackgroundColor.ToUpperInvariant();
                 StartupRegistration.SetEnabled(updated.StartOnLogin);
                 try { settingsStore.Save(updated); }
                 catch
@@ -298,6 +304,7 @@ namespace AiSelectionToolbar.Desktop
             NotesDirectory = source.NotesDirectory,
             CustomActions = CopyActions(source.CustomActions),
             ToolbarStyle = source.ToolbarStyle, ToolbarAccentColor = source.ToolbarAccentColor,
+            AnswerBackgroundColor = source.AnswerBackgroundColor,
             ActiveApiId = source.ActiveApiId,
             ApiProfiles = CopyApiProfiles(source.ApiProfiles)
         };

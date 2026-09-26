@@ -7,7 +7,6 @@ const status = message => { byId("status").textContent = message; };
 let customActions = [];
 let apiProfiles = [];
 let activeApiId = "";
-let historyOffset = 0;
 let historyRequest = 0;
 
 async function api(path, method = "GET", body) {
@@ -58,12 +57,31 @@ function updatePreview() {
   const color = byId("toolbarColor").value.toUpperCase();
   byId("colorValue").textContent = color;
   document.documentElement.style.setProperty("--toolbar-accent", color);
+  const answerColor = byId("answerColor").value.toUpperCase();
+  byId("answerColorValue").textContent = answerColor;
   const preview = byId("toolbarPreview");
   preview.classList.toggle("compact", byId("toolbarStyle").value === "compact");
   while (preview.children.length > 5) preview.lastElementChild.remove();
   for (const item of customActions) {
     const chip = document.createElement("span"); chip.textContent = item.Name || "新按钮"; preview.append(chip);
   }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[character]));
+}
+function renderIndexMarkdown(value) {
+  return escapeHtml(String(value || "").replace(/\s+/g, " ").trim() || "未命名记录")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+function parseHistoryDate(value) {
+  if (typeof value === "number") return new Date(value);
+  const text = String(value || "");
+  const dotNet = text.match(/\/Date\((\d+)\)\//);
+  if (dotNet) return new Date(Number(dotNet[1]));
+  return new Date(text);
 }
 
 function renderCustomActions() {
@@ -145,6 +163,8 @@ function renderApiProfiles() {
 
 async function loadSettings() {
   const value = await api("/api/settings");
+  byId("appVersion").textContent = value.Version ? "v" + value.Version : "v—";
+  byId("appAuthor").textContent = value.Author ? "作者：" + value.Author : "作者：—";
   byId("autoShow").checked = !!value.AutoShow;
   byId("startOnLogin").checked = !!value.StartOnLogin;
   byId("language").value = value.TargetLanguage || "";
@@ -156,6 +176,7 @@ async function loadSettings() {
   editApi(apiProfiles.find(x => x.Id === editingId) || apiProfiles.find(x => x.Id === activeApiId) || null);
   byId("toolbarStyle").value = value.ToolbarStyle === "compact" ? "compact" : "standard";
   byId("toolbarColor").value = /^#[0-9a-f]{6}$/i.test(value.ToolbarAccentColor || "") ? value.ToolbarAccentColor : "#4F46E5";
+  byId("answerColor").value = /^#[0-9a-f]{6}$/i.test(value.AnswerBackgroundColor || "") ? value.AnswerBackgroundColor : "#F8FAFC";
   customActions = (value.CustomActions || []).map(x => ({Id: x.Id || "", Name: x.Name || "", Prompt: x.Prompt || ""}));
   renderCustomActions(); renderExclusions(value.ExcludedApplications || []);
 }
@@ -167,6 +188,7 @@ async function saveSettings() {
     AutoShow: byId("autoShow").checked, StartOnLogin: byId("startOnLogin").checked,
     TargetLanguage: byId("language").value.trim(), NotesDirectory: byId("notesDirectory").value.trim(),
     ToolbarStyle: byId("toolbarStyle").value, ToolbarAccentColor: byId("toolbarColor").value.toUpperCase(),
+    AnswerBackgroundColor: byId("answerColor").value.toUpperCase(),
     CustomActions: customActions.map(x => ({Id: x.Id, Name: x.Name.trim(), Prompt: x.Prompt.trim()}))
   });
   await loadSettings(); // Retrieve generated IDs for new buttons.
@@ -174,16 +196,13 @@ async function saveSettings() {
 }
 
 async function loadHistory() {
-  const request = ++historyRequest, offset = historyOffset;
+  const request = ++historyRequest;
   const query = byId("historySearch").value.trim();
-  const items = await api("/api/history?search=" + encodeURIComponent(query) + "&offset=" + offset);
+  const items = await api("/api/history?search=" + encodeURIComponent(query) + "&limit=200");
   if (request !== historyRequest) return;
   const list = byId("historyList"); list.replaceChildren();
   const index = byId("historyIndex"); index.replaceChildren();
   byId("historyIndexCount").textContent = items.length ? "· " + items.length + " 条" : "";
-  byId("historyPage").textContent = "第 " + (Math.floor(offset / 50) + 1) + " 页";
-  byId("historyPrev").disabled = offset === 0;
-  byId("historyNext").disabled = items.length < 50;
   if (!items.length) {
     const empty = document.createElement("div"); empty.className = "card empty"; empty.textContent = "没有匹配的历史记录"; list.append(empty);
     index.textContent = "本页没有记录"; return;
@@ -193,8 +212,7 @@ async function loadHistory() {
     const card = document.createElement("article"); card.className = "entry";
     card.id = "history-entry-" + request + "-" + position;
     const meta = document.createElement("div"); meta.className = "meta";
-    const dateValue = typeof item.TimeUtc === "string" ? Number(item.TimeUtc.match(/\d+/)?.[0] || 0) : item.TimeUtc;
-    const date = new Date(dateValue);
+    const date = parseHistoryDate(item.TimeUtc);
     const dateLabel = isNaN(date.getTime()) ? "日期未知" : date.toLocaleDateString();
     if (dateLabel !== previousDate) {
       const group = document.createElement("div"); group.className = "history-index-date"; group.textContent = dateLabel;
@@ -202,22 +220,30 @@ async function loadHistory() {
     }
     const configuredAction = (item.Action || "").startsWith("custom:")
       ? customActions.find(x => x.Id === item.Action.slice(7)) : null;
+    const actionLabels = {explain: "了解", explain_detailed: "详细解释", translate: "翻译", ask: "提问"};
     const actionName = (item.Action || "").startsWith("custom:")
-      ? "自定义 · " + (configuredAction?.Name || "操作") : (item.Action || "操作");
+      ? "自定义 · " + (configuredAction?.Name || "操作") : (actionLabels[item.Action] || item.Action || "操作");
     meta.textContent = (isNaN(date.getTime()) ? dateLabel : date.toLocaleString()) + "  ·  " + actionName + "  ·  " + (item.Application || "未知程序");
+    const indexItem = document.createElement("div"); indexItem.className = "history-index-item";
     const jump = document.createElement("button"); jump.type = "button";
-    const title = document.createElement("strong"); title.textContent = (item.Selection || "").replace(/\s+/g, " ").trim() || "未命名记录";
+    const title = document.createElement("strong"); title.innerHTML = renderIndexMarkdown(item.Selection);
     const subtitle = document.createElement("small"); subtitle.textContent = actionName;
     jump.append(title, subtitle);
     jump.addEventListener("click", () => {
       for (const button of index.querySelectorAll("button")) button.classList.remove("active");
       jump.classList.add("active"); card.scrollIntoView({behavior: "smooth", block: "start"});
     });
-    index.append(jump);
+    const deleteIndex = document.createElement("button"); deleteIndex.type = "button"; deleteIndex.className = "history-index-delete";
+    deleteIndex.textContent = "🗑"; deleteIndex.title = "删除当前记录"; deleteIndex.setAttribute("aria-label", "删除当前记录");
+    deleteIndex.addEventListener("click", () => run(async () => {
+      if (!confirm("删除这条历史记录？")) return;
+      await api("/api/history/delete", "POST", {id: item.Id}); await loadHistory(); status("已删除历史记录");
+    }));
+    indexItem.append(jump, deleteIndex); index.append(indexItem);
     const selection = document.createElement("div"); selection.className = "selection"; selection.textContent = item.Selection || "";
     card.append(meta, selection);
     if (item.Prompt) { const question = document.createElement("div"); question.className = "question"; question.textContent = "提问：" + item.Prompt; card.append(question); }
-    const result = document.createElement("div"); result.className = "result"; result.textContent = item.Result || "";
+    const result = document.createElement("div"); result.className = "result"; result.textContent = item.Result || item.Response || "";
     const footer = document.createElement("div"); footer.className = "entry-footer";
     const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除记录";
     remove.addEventListener("click", () => run(async () => {
@@ -233,6 +259,7 @@ byId("saveSettings").addEventListener("click", () => run(saveSettings));
 byId("saveToolbar").addEventListener("click", () => run(saveSettings));
 byId("toolbarStyle").addEventListener("change", updatePreview);
 byId("toolbarColor").addEventListener("input", updatePreview);
+byId("answerColor").addEventListener("input", updatePreview);
 byId("addCustomAction").addEventListener("click", () => {
   if (customActions.length >= 8) return;
   customActions.push({Id: "", Name: "", Prompt: ""}); renderCustomActions();
@@ -255,12 +282,10 @@ byId("exeFile").addEventListener("change", event => run(async () => {
     await loadExclusions(); status("已排除 " + file.name);
   } finally { event.target.value = ""; }
 }));
-byId("historySearch").addEventListener("input", () => { historyOffset = 0; run(loadHistory); });
-byId("historyPrev").addEventListener("click", () => { historyOffset = Math.max(0, historyOffset - 50); run(loadHistory); });
-byId("historyNext").addEventListener("click", () => { historyOffset += 50; run(loadHistory); });
+byId("historySearch").addEventListener("input", () => run(loadHistory));
 byId("clearHistory").addEventListener("click", () => run(async () => {
   if (!confirm("确定清空全部历史记录？此操作无法撤销。")) return;
-  await api("/api/history/clear", "POST", {}); historyOffset = 0;
+  await api("/api/history/clear", "POST", {});
   await loadHistory(); status("历史记录已清空");
 }));
 run(loadSettings);

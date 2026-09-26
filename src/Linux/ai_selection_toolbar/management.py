@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import sys
 import threading
@@ -62,10 +63,11 @@ class ManagementServer:
                     term = (query.get("search") or [""])[0][:200]
                     try:
                         offset = max(0, int((query.get("offset") or ["0"])[0]))
+                        limit = min(500, max(1, int((query.get("limit") or ["200"])[0])))
                     except ValueError:
                         self._error(HTTPStatus.BAD_REQUEST, "历史分页参数无效")
                         return
-                    self._json(owner.history.search(term, offset) if owner.history else [])
+                    self._json(owner.history.search(term, offset, limit) if owner.history else [])
                 else:
                     self._error(HTTPStatus.NOT_FOUND, "Not found")
 
@@ -106,6 +108,9 @@ class ManagementServer:
 
             def _save_general(self, payload: dict[str, Any]) -> None:
                 settings = owner.store.load()
+                answer_color = str(payload.get("AnswerBackgroundColor", "#F8FAFC")).upper()
+                if not re.fullmatch(r"#[0-9A-F]{6}", answer_color):
+                    raise ValueError("回答框颜色应为 #RRGGBB")
                 language = str(payload.get("TargetLanguage") or "").strip()
                 if not language or len(language) > 50:
                     raise ValueError("翻译目标语言无效")
@@ -119,6 +124,7 @@ class ManagementServer:
                     "NotesDirectory": notes,
                     "ToolbarStyle": payload.get("ToolbarStyle", "standard"),
                     "ToolbarAccentColor": payload.get("ToolbarAccentColor", "#4F46E5"),
+                    "AnswerBackgroundColor": answer_color,
                     "CustomActions": payload.get("CustomActions") or [],
                 })
                 owner.store.save(settings)
