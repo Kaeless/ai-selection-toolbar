@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QPoint, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices, QIcon
+from PySide6.QtGui import QAction, QCursor, QDesktopServices, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from .api import ChatWorker
@@ -79,7 +79,13 @@ class ApplicationController:
         self.selection_text = text
         self.selection_app = application
         self.selection_title = title
-        self.anchor = QPoint(x, y)
+        # X11 returns physical root coordinates while Qt may expose scaled
+        # logical coordinates on HiDPI/XWayland desktops. Use Qt's current
+        # global cursor position for popup placement to keep both coordinate
+        # systems consistent.
+        self.anchor = QCursor.pos()
+        if self.anchor.isNull():
+            self.anchor = QPoint(x, y)
         self.answer.hide()
         self.toolbar.show_below(self.anchor)
 

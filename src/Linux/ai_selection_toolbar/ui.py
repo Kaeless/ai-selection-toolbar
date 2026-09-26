@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
@@ -36,7 +37,7 @@ class Toolbar(QWidget):
 
     def __init__(self) -> None:
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(8, 7, 8, 7)
         self.layout.setSpacing(4)
@@ -66,7 +67,7 @@ class Toolbar(QWidget):
         self.layout.addWidget(exclude)
         padding = "5px 9px" if compact else "8px 12px"
         self.setStyleSheet(f"""
-            Toolbar {{ background: #121826; border: 1px solid #293143; border-radius: 14px; }}
+            Toolbar {{ background: #1b2433; border: 1px solid #46546b; border-radius: 14px; }}
             QPushButton {{ color: #dce4f2; background: transparent; border: 0; border-radius: 8px;
                           padding: {padding}; font-size: 13px; }}
             QPushButton:hover {{ background: #273146; color: white; }}
@@ -121,8 +122,19 @@ class AnswerWindow(QWidget):
 
     def set_answer(self, markdown: str, complete: bool = False) -> None:
         self.viewer.setMarkdown(markdown)
+        self._fit_to_answer()
         if complete:
             self.heading.setText("回答完成")
+
+    def _fit_to_answer(self) -> None:
+        """Grow with streamed content, then let the viewer scroll long answers."""
+        document = self.viewer.document()
+        document.setTextWidth(self.viewer.viewport().width())
+        document.adjustSize()
+        content_height = math.ceil(document.size().height())
+        target_height = max(220, min(720, content_height + 82))
+        if target_height != self.height():
+            self.resize(self.width(), target_height)
 
     def set_error(self, message: str) -> None:
         self.heading.setText("请求失败")
