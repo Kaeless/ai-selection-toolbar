@@ -14,4 +14,4 @@
 
 ## 验证与下载
 
-等待 Windows CI 的编译、安装/卸载、启动和 SQLite 基础检查。Windows 7 SP1 x64、Windows 11 及目标软件的交互需要按[实机验收表](./WINDOWS-ACCEPTANCE.md)记录。
+[Windows CI](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36220593415)已通过编译、安装/卸载、桌面程序启动、本机管理页与 SQLite 基础检查。[安装 EXE 工件](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36220593415/artifacts/10898339617)可下载；完整工件还包含便携 ZIP。Windows 7 SP1 x64、Windows 11 及目标软件的交互需要按[实机验收表](./WINDOWS-ACCEPTANCE.md)记录。
