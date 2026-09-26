@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace AiSelectionToolbar.Desktop
 {
@@ -20,9 +21,6 @@ namespace AiSelectionToolbar.Desktop
                 host.Connect(window);
                 MainWindow = window;
                 var menu = new System.Windows.Forms.ContextMenuStrip();
-                menu.Items.Add("显示工具栏", null, (sender, args) => Dispatcher.BeginInvoke(new Action(() => {
-                    window.Show(); window.ShowExpanded(); window.Activate();
-                })));
                 menu.Items.Add("设置和历史", null, (sender, args) => Dispatcher.BeginInvoke(new Action(window.OpenManagement)));
                 menu.Items.Add("退出", null, (sender, args) => Dispatcher.BeginInvoke(new Action(window.Close)));
                 appIcon = System.Drawing.Icon.ExtractAssociatedIcon(
@@ -31,13 +29,15 @@ namespace AiSelectionToolbar.Desktop
                     Text = "AI 划词工具栏", Icon = appIcon,
                     ContextMenuStrip = menu, Visible = true
                 };
-                tray.DoubleClick += (sender, args) => Dispatcher.BeginInvoke(new Action(() => {
-                    window.Show(); window.ShowExpanded(); window.Activate();
-                }));
-                if (host.IsConfigured) window.Opacity = 0;
-                else window.ShowExpanded();
+                tray.DoubleClick += (sender, args) => Dispatcher.BeginInvoke(new Action(window.OpenManagement));
+                var needsSetup = !host.IsConfigured;
+                window.Opacity = 0;
                 window.Show();
-                if (host.IsConfigured) { window.Hide(); window.Opacity = 1; }
+                window.Hide();
+                window.Opacity = 1;
+                if (needsSetup)
+                    Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+                        new Action(window.OpenManagement));
                 if (!host.HotkeyAvailable)
                     MessageBox.Show(window, "Ctrl+Shift+Space 已被其他程序占用；鼠标划词仍可使用。",
                         "快捷键不可用", MessageBoxButton.OK, MessageBoxImage.Information);

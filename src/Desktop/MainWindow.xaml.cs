@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -10,6 +12,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Media;
+using System.Windows.Documents;
+using System.Windows.Navigation;
 using AiSelectionToolbar.Core;
 
 namespace AiSelectionToolbar.Desktop
@@ -23,11 +27,15 @@ namespace AiSelectionToolbar.Desktop
         private CancellationTokenSource _generation;
         private LocalManagementServer _server;
         private string _sourceApplication = "演示";
+        private string _selectedText = "";
         private string _lastExplanation;
         private string _sourceTitle = "";
         private Rectangle _selectionBounds;
-        private double _compactWidth = 430;
+        private double _compactWidth = 520;
         private double _compactHeight = 62;
+        private readonly StringBuilder _rawResult = new StringBuilder();
+        private bool _receivedReasoning;
+        private readonly DispatcherTimer _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
         private readonly DispatcherTimer _dismissTimer = new DispatcherTimer {
             Interval = TimeSpan.FromSeconds(8)
         };
@@ -51,19 +59,20 @@ namespace AiSelectionToolbar.Desktop
                 _dismissTimer.Stop();
                 if (QuickPanel.Visibility == Visibility.Visible) Hide();
             };
+            _renderTimer.Tick += (sender, args) => { _renderTimer.Stop(); RenderResult(); };
         }
 
         public void ShowExpanded()
         {
             _dismissTimer.Stop();
-            MinWidth = 480;
-            MinHeight = 380;
-            Width = 540;
-            Height = 430;
-            ResizeMode = ResizeMode.CanResizeWithGrip;
+            MinWidth = 360;
+            MinHeight = 150;
+            Width = 420;
+            Height = 155;
+            ResizeMode = ResizeMode.NoResize;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
-            Topmost = false;
+            Topmost = true;
             if (IsVisible)
             {
                 if (!_selectionBounds.IsEmpty) PositionNearSelection(_selectionBounds);
@@ -99,10 +108,7 @@ namespace AiSelectionToolbar.Desktop
             catch { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4F46E5"); }
             var brush = new SolidColorBrush(accent);
             AccentBadge.Background = brush;
-            ExpandedAccentBadge.Background = brush;
             QuickCustomActions.Children.Clear();
-            ExpandedCustomActions.Children.Clear();
-            var customWidth = 0d;
             if (settings.CustomActions != null)
             {
                 foreach (var custom in settings.CustomActions)
@@ -110,15 +116,25 @@ namespace AiSelectionToolbar.Desktop
                     if (custom == null || string.IsNullOrWhiteSpace(custom.Id) ||
                         string.IsNullOrWhiteSpace(custom.Name)) continue;
                     QuickCustomActions.Children.Add(CreateCustomButton(custom));
-                    ExpandedCustomActions.Children.Add(CreateCustomButton(custom));
-                    customWidth += Math.Min(156, 28 + custom.Name.Length * 15);
                 }
             }
             var compact = string.Equals(settings.ToolbarStyle, "compact", StringComparison.Ordinal);
-            var overflow = 430 + customWidth > 760;
-            _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
-            _compactWidth = Math.Max(430, Math.Min(760, 430 + customWidth));
             QuickCustomActions.Margin = compact ? new Thickness(0) : new Thickness(0, 0, 3, 0);
+            QuickButtonStrip.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+            var chrome = QuickScroll.Padding.Left + QuickScroll.Padding.Right +
+                QuickPanel.BorderThickness.Left + QuickPanel.BorderThickness.Right +
+                QuickPanel.Margin.Left + QuickPanel.Margin.Right + 2;
+            var requiredWidth = Math.Ceiling(QuickButtonStrip.DesiredSize.Width + chrome);
+            var workArea = System.Windows.Forms.Screen.FromRectangle(_selectionBounds.IsEmpty
+                ? System.Windows.Forms.Screen.PrimaryScreen.WorkingArea : _selectionBounds).WorkingArea;
+            var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+            var maxWidth = transform.HasValue
+                ? transform.Value.Transform(new System.Windows.Point(workArea.Right, 0)).X -
+                  transform.Value.Transform(new System.Windows.Point(workArea.Left, 0)).X - 24
+                : SystemParameters.WorkArea.Width - 24;
+            _compactWidth = Math.Min(requiredWidth, Math.Max(160, maxWidth));
+            var overflow = requiredWidth > _compactWidth;
+            _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
             QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
                 new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
         }
@@ -162,16 +178,23 @@ namespace AiSelectionToolbar.Desktop
             var processName = NormalizeApplicationName(sourceApplication);
             if (GetSettings().ExcludedApplications.Any(x =>
                 string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase))) return;
+            // Clicking a button can leave the source app foreground with its old selection.
+            // A second mouse-up must not replace an open answer or cancel its stream.
+            if (IsVisible && ExpandedPanel.Visibility == Visibility.Visible &&
+                string.Equals(_selectedText, text, StringComparison.Ordinal) &&
+                string.Equals(_sourceApplication, sourceApplication, StringComparison.OrdinalIgnoreCase)) return;
             CancelGeneration();
             _selectionBounds = bounds;
             ShowCompact();
             _sourceApplication = sourceApplication;
+            _selectedText = text;
             _lastExplanation = null;
+            NoteButton.IsEnabled = false;
             _sourceTitle = sourceTitle ?? "";
-            SelectionText.Text = text;
-            SourceLabel.Text = string.IsNullOrWhiteSpace(sourceTitle)
-                ? sourceApplication : sourceApplication + " · " + sourceTitle;
-            ResultText.Text = "选择解释、翻译或提问。";
+            _rawResult.Clear();
+            _receivedReasoning = false;
+            _renderTimer.Stop();
+            RenderResult();
             StatusLabel.Text = "已捕获选区";
             if (GetSettings().AutoShow)
             {
@@ -196,7 +219,7 @@ namespace AiSelectionToolbar.Desktop
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            RefreshToolbarAppearance();
+            ShowCompact();
             Left = Math.Max(0, SystemParameters.WorkArea.Right - Width - 24);
             Top = Math.Max(0, SystemParameters.WorkArea.Bottom - Height - 24);
             _server = new LocalManagementServer(GetSettings, UpdateSettings, GetHistory,
@@ -210,6 +233,7 @@ namespace AiSelectionToolbar.Desktop
         private void Window_Closed(object sender, EventArgs e)
         {
             _dismissTimer.Stop();
+            _renderTimer.Stop();
             CancelGeneration();
             if (_selectionSource != null) _selectionSource.SelectionCaptured -= SelectionCaptured;
             if (_server != null) _server.Dispose();
@@ -223,6 +247,7 @@ namespace AiSelectionToolbar.Desktop
         private void Close_Click(object sender, RoutedEventArgs e)
         {
             _dismissTimer.Stop();
+            _renderTimer.Stop();
             CancelGeneration();
             Hide();
         }
@@ -237,14 +262,8 @@ namespace AiSelectionToolbar.Desktop
             }
             catch (Exception ex)
             {
-                ShowExpanded();
-                StatusLabel.Text = "无法排除程序：" + ex.Message;
+                MessageBox.Show(this, "无法排除程序：" + ex.Message, "排除程序");
             }
-        }
-
-        private void Demo_Click(object sender, RoutedEventArgs e)
-        {
-            ShowSelection("XDP 程序在网卡驱动收包后、构造 skb 之前执行。", "演示程序", "eBPF 学习笔记");
         }
 
         private void Manage_Click(object sender, RoutedEventArgs e)
@@ -256,66 +275,113 @@ namespace AiSelectionToolbar.Desktop
         {
             if (_server == null || !_server.IsRunning)
             {
-                StatusLabel.Text = "本机管理页不可用";
+                MessageBox.Show(this, "本机管理页不可用。", "设置和历史");
                 return;
             }
             try { Process.Start(new ProcessStartInfo(_server.ManagementUrl) { UseShellExecute = true }); }
-            catch (Exception ex) { StatusLabel.Text = "无法打开管理页：" + ex.Message; }
+            catch (Exception ex) { MessageBox.Show(this, "无法打开管理页：" + ex.Message, "设置和历史"); }
         }
 
         private async void Action_Click(object sender, RoutedEventArgs e)
         {
             var action = ((Button)sender).Tag as string;
-            var selection = SelectionText.Text.Trim();
-            if (selection.Length == 0) { StatusLabel.Text = "请先选择文字"; return; }
-            ShowExpanded();
+            var selection = _selectedText.Trim();
+            if (selection.Length == 0)
+            {
+                ShowExpanded();
+                _rawResult.Clear(); _rawResult.Append("请先选中文字，再选择操作。"); RenderResult();
+                return;
+            }
             string prompt = "";
             if (action == "ask")
             {
                 var entered = EditText("输入问题", "请针对选中文字提问：", "");
                 if (entered == null) return;
                 prompt = entered.Trim();
-                if (prompt.Length == 0) { StatusLabel.Text = "问题不能为空"; return; }
+                if (prompt.Length == 0) { MessageBox.Show(this, "问题不能为空。", "提问"); return; }
             }
             CancelGeneration();
+            _rawResult.Clear();
+            _receivedReasoning = false;
+            ShowExpanded();
             var cancellation = new CancellationTokenSource();
             _generation = cancellation;
+            NoteButton.IsEnabled = false;
             StopButton.IsEnabled = true;
-            ResultText.Clear();
+            RenderResult();
             StatusLabel.Text = "生成中…";
-            var progress = new Progress<string>(chunk =>
+            var progress = new UiProgress(Dispatcher, chunk =>
             {
                 if (_generation != cancellation || cancellation.IsCancellationRequested) return;
-                ResultText.AppendText(chunk);
-                ResultText.ScrollToEnd();
+                if (chunk == null) _receivedReasoning = true;
+                else _rawResult.Append(chunk);
+                if (!_renderTimer.IsEnabled) _renderTimer.Start();
             });
             try
             {
                 await ActionProvider.RunAsync(action, selection, prompt, progress, cancellation.Token);
                 if (_generation == cancellation)
                 {
-                    StatusLabel.Text = "完成";
-                    if (action == "explain") _lastExplanation = ResultText.Text;
-                    AddHistory(action, selection, ResultText.Text, _sourceApplication, prompt);
+                    _renderTimer.Stop();
+                    var hasAnswer = _rawResult.Length > 0;
+                    if (!hasAnswer)
+                        _rawResult.Append("模型未返回回答正文，请重试或切换模型。");
+                    RenderResult();
+                    StatusLabel.Text = hasAnswer ? "完成" : "无回答正文";
+                    if (hasAnswer && (action == "explain" || action == "explain_detailed"))
+                    {
+                        _lastExplanation = _rawResult.ToString();
+                        NoteButton.IsEnabled = !string.IsNullOrWhiteSpace(_lastExplanation);
+                    }
+                    if (hasAnswer)
+                        AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, prompt);
                 }
             }
-            catch (OperationCanceledException) { if (_generation == cancellation) StatusLabel.Text = "已停止"; }
+            catch (OperationCanceledException)
+            {
+                if (_generation == cancellation)
+                {
+                    _renderTimer.Stop();
+                    _rawResult.Append((_rawResult.Length == 0 ? "" : "\n\n") + "模型响应超时，请重试。");
+                    RenderResult();
+                    StatusLabel.Text = "请求超时";
+                }
+            }
             catch (Exception ex)
             {
                 if (_generation == cancellation)
                 {
-                    ResultText.AppendText((ResultText.Text.Length == 0 ? "" : "\n\n") + ex.Message);
+                    _rawResult.Append((_rawResult.Length == 0 ? "" : "\n\n") + ex.Message);
+                    _renderTimer.Stop(); RenderResult();
                     StatusLabel.Text = "操作失败，详情见结果区";
                 }
             }
             finally
             {
                 if (_generation == cancellation) { _generation = null; StopButton.IsEnabled = false; }
+                if (_generation == null) { _renderTimer.Stop(); RenderResult(); }
                 cancellation.Dispose();
             }
         }
 
-        private void Stop_Click(object sender, RoutedEventArgs e) { CancelGeneration(); StatusLabel.Text = "已停止"; }
+        private void Stop_Click(object sender, RoutedEventArgs e)
+        {
+            CancelGeneration();
+            _renderTimer.Stop();
+            if (_rawResult.Length == 0) _rawResult.Append("已停止。");
+            RenderResult();
+            StatusLabel.Text = "已停止";
+        }
+
+        private void Copy_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var plain = new TextRange(ResultView.Document.ContentStart, ResultView.Document.ContentEnd).Text.Trim();
+                if (plain.Length > 0) Clipboard.SetText(plain);
+            }
+            catch (Exception ex) { MessageBox.Show(this, "复制失败：" + ex.Message, "复制回答"); }
+        }
 
         private void CancelGeneration()
         {
@@ -327,8 +393,8 @@ namespace AiSelectionToolbar.Desktop
 
         private void Note_Click(object sender, RoutedEventArgs e)
         {
-            var selection = SelectionText.Text.Trim();
-            if (selection.Length == 0) { StatusLabel.Text = "请先选择文字"; return; }
+            var selection = _selectedText.Trim();
+            if (selection.Length == 0) return;
             if (string.IsNullOrWhiteSpace(_lastExplanation))
             { StatusLabel.Text = "请先完成解释，再保存笔记"; return; }
             var initial = _lastExplanation;
@@ -346,7 +412,7 @@ namespace AiSelectionToolbar.Desktop
                 else AddHistory("note", selection, edited, _sourceApplication, "");
                 StatusLabel.Text = "笔记已保存";
             }
-            catch (Exception ex) { StatusLabel.Text = "笔记保存失败：" + ex.Message; }
+            catch (Exception ex) { MessageBox.Show(this, "笔记保存失败：" + ex.Message, "保存笔记"); }
         }
 
         private string EditText(string title, string instruction, string initial)
@@ -374,9 +440,238 @@ namespace AiSelectionToolbar.Desktop
             return editor.ShowDialog() == true ? note.Text : null;
         }
 
+        private void RenderResult()
+        {
+            var markdown = _rawResult.ToString();
+            var document = new FlowDocument {
+                FontFamily = new System.Windows.Media.FontFamily("Segoe UI, Microsoft YaHei"), FontSize = 14,
+                PagePadding = new Thickness(9), ColumnWidth = 1000
+            };
+            if (markdown.Length == 0)
+            {
+                document.Blocks.Add(new Paragraph(new Run(_receivedReasoning ? "模型正在思考，等待回答正文…" : "正在生成…")) {
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(135, 147, 164)) });
+            }
+            else
+            {
+                var lines = markdown.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+                var code = new StringBuilder();
+                var inCode = false;
+                for (var index = 0; index < lines.Length; index++)
+                {
+                    var line = lines[index];
+                    if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+                    {
+                        if (inCode) { AddCodeBlock(document, code.ToString()); code.Clear(); }
+                        inCode = !inCode;
+                        continue;
+                    }
+                    if (inCode) { code.AppendLine(line); continue; }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    var headingLevel = 0;
+                    while (headingLevel < line.Length && headingLevel < 3 && line[headingLevel] == '#') headingLevel++;
+                    if (headingLevel > 0 && headingLevel < line.Length && line[headingLevel] == ' ')
+                    {
+                        var heading = new Paragraph { FontWeight = FontWeights.SemiBold,
+                            FontSize = headingLevel == 1 ? 20 : headingLevel == 2 ? 17 : 15,
+                            Margin = new Thickness(0, 10, 0, 7) };
+                        AddInlines(heading.Inlines, line.Substring(headingLevel + 1));
+                        document.Blocks.Add(heading);
+                        continue;
+                    }
+
+                    bool ordered;
+                    string itemText;
+                    if (TryListItem(line, out ordered, out itemText))
+                    {
+                        var list = new System.Windows.Documents.List {
+                            MarkerStyle = ordered ? TextMarkerStyle.Decimal : TextMarkerStyle.Disc,
+                            Margin = new Thickness(18, 4, 0, 8) };
+                        do
+                        {
+                            var paragraph = new Paragraph { Margin = new Thickness(0, 2, 0, 2) };
+                            AddInlines(paragraph.Inlines, itemText);
+                            list.ListItems.Add(new ListItem(paragraph));
+                            if (index + 1 >= lines.Length) break;
+                            bool nextOrdered;
+                            string nextText;
+                            if (!TryListItem(lines[index + 1], out nextOrdered, out nextText) || nextOrdered != ordered) break;
+                            index++;
+                            itemText = nextText;
+                        } while (true);
+                        document.Blocks.Add(list);
+                        continue;
+                    }
+                    var body = new Paragraph { Margin = new Thickness(0, 0, 0, 9), LineHeight = 22 };
+                    AddInlines(body.Inlines, line);
+                    document.Blocks.Add(body);
+                }
+                if (inCode) AddCodeBlock(document, code.ToString());
+            }
+            ResultView.Document = document;
+            ResultView.ScrollToEnd();
+            ResizeAnswerToContent(markdown);
+        }
+
+        private void ResizeAnswerToContent(string markdown)
+        {
+            if (ExpandedPanel.Visibility != Visibility.Visible) return;
+            var area = System.Windows.Forms.Screen.FromRectangle(_selectionBounds.IsEmpty
+                ? System.Windows.Forms.Screen.PrimaryScreen.WorkingArea : _selectionBounds).WorkingArea;
+            var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+            var topLeft = transform.HasValue
+                ? transform.Value.Transform(new System.Windows.Point(area.Left, area.Top))
+                : new System.Windows.Point(SystemParameters.WorkArea.Left, SystemParameters.WorkArea.Top);
+            var bottomRight = transform.HasValue
+                ? transform.Value.Transform(new System.Windows.Point(area.Right, area.Bottom))
+                : new System.Windows.Point(SystemParameters.WorkArea.Right, SystemParameters.WorkArea.Bottom);
+            var maxWidth = Math.Max(360, bottomRight.X - topLeft.X - 24);
+            var maxHeight = Math.Max(150, bottomRight.Y - topLeft.Y - 24);
+            var lines = (markdown.Length == 0 ? "正在生成…" : markdown)
+                .Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            var typeface = new Typeface(new System.Windows.Media.FontFamily("Segoe UI"),
+                FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            var longest = 0d;
+            foreach (var line in lines)
+            {
+                if (line.Length == 0) continue;
+                var measured = new FormattedText(line, CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, typeface, 14, System.Windows.Media.Brushes.Black, pixelsPerDip);
+                longest = Math.Max(longest, measured.WidthIncludingTrailingWhitespace);
+            }
+            var targetWidth = Math.Min(maxWidth, Math.Max(380, Math.Min(650, longest + 100)));
+            Width = targetWidth;
+
+            var contentWidth = Math.Max(220, targetWidth - 95);
+            var contentHeight = 0d;
+            var inCode = false;
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+                { inCode = !inCode; contentHeight += 8; continue; }
+                if (string.IsNullOrWhiteSpace(line))
+                { contentHeight += 4; continue; }
+                var fontSize = line.StartsWith("# ", StringComparison.Ordinal) ? 20 :
+                    line.StartsWith("## ", StringComparison.Ordinal) ? 17 : 14;
+                var measured = new FormattedText(line, CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, typeface, fontSize, System.Windows.Media.Brushes.Black, pixelsPerDip) {
+                    MaxTextWidth = contentWidth - (inCode ? 12 : 0)
+                };
+                contentHeight += Math.Max(inCode ? 19 : 22, measured.Height) + (inCode ? 1 : 7);
+            }
+            // Header, outer margins, document padding and result surface.
+            Height = Math.Min(maxHeight, Math.Max(150, Math.Ceiling(contentHeight + 122)));
+            if (IsVisible)
+            {
+                Left = Math.Max(topLeft.X, Math.Min(Left, bottomRight.X - Width));
+                Top = Math.Max(topLeft.Y, Math.Min(Top, bottomRight.Y - Height));
+            }
+        }
+
+        private static bool TryListItem(string line, out bool ordered, out string content)
+        {
+            var trimmed = line.TrimStart();
+            ordered = false;
+            content = null;
+            if (trimmed.Length >= 2 && (trimmed[0] == '-' || trimmed[0] == '*') && trimmed[1] == ' ')
+            { content = trimmed.Substring(2); return true; }
+            var digits = 0;
+            while (digits < trimmed.Length && digits < 3 && char.IsDigit(trimmed[digits])) digits++;
+            if (digits > 0 && digits + 1 < trimmed.Length && trimmed[digits] == '.' && trimmed[digits + 1] == ' ')
+            { ordered = true; content = trimmed.Substring(digits + 2); return true; }
+            return false;
+        }
+
+        private static void AddCodeBlock(FlowDocument document, string content)
+        {
+            document.Blocks.Add(new Paragraph(new Run(content.TrimEnd('\n'))) {
+                FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 12.5,
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(234, 238, 246)),
+                Padding = new Thickness(10), Margin = new Thickness(0, 6, 0, 11) });
+        }
+
+        // Builds document objects from text. Markdown is never parsed as XAML or HTML.
+        private static void AddInlines(InlineCollection target, string source)
+        {
+            var plain = new StringBuilder();
+            Action flush = () => { if (plain.Length > 0) { target.Add(new Run(plain.ToString())); plain.Clear(); } };
+            for (var index = 0; index < source.Length;)
+            {
+                if (source[index] == '\\' && index + 1 < source.Length)
+                { plain.Append(source[index + 1]); index += 2; continue; }
+                if (index + 1 < source.Length && source[index] == '*' && source[index + 1] == '*')
+                {
+                    var end = source.IndexOf("**", index + 2, StringComparison.Ordinal);
+                    if (end > index + 2)
+                    { flush(); target.Add(new Bold(new Run(source.Substring(index + 2, end - index - 2)))); index = end + 2; continue; }
+                }
+                if (source[index] == '*' || source[index] == '`')
+                {
+                    var marker = source[index];
+                    var end = source.IndexOf(marker, index + 1);
+                    if (end > index + 1)
+                    {
+                        flush();
+                        var content = new Run(source.Substring(index + 1, end - index - 1));
+                        if (marker == '*') target.Add(new Italic(content));
+                        else target.Add(new Span(content) {
+                            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                            Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(234, 238, 246)) });
+                        index = end + 1; continue;
+                    }
+                }
+                if (source[index] == '[')
+                {
+                    var labelEnd = source.IndexOf("](", index + 1, StringComparison.Ordinal);
+                    var urlEnd = labelEnd < 0 ? -1 : source.IndexOf(')', labelEnd + 2);
+                    Uri uri;
+                    if (labelEnd > index + 1 && urlEnd > labelEnd + 2 &&
+                        Uri.TryCreate(source.Substring(labelEnd + 2, urlEnd - labelEnd - 2), UriKind.Absolute, out uri) &&
+                        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                    {
+                        flush();
+                        var link = new Hyperlink(new Run(source.Substring(index + 1, labelEnd - index - 1))) {
+                            NavigateUri = uri,
+                            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(70, 81, 210)) };
+                        link.RequestNavigate += Link_RequestNavigate;
+                        target.Add(link);
+                        index = urlEnd + 1; continue;
+                    }
+                }
+                plain.Append(source[index++]);
+            }
+            flush();
+        }
+
+        private static void Link_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            e.Handled = true;
+            if (e.Uri == null || (e.Uri.Scheme != Uri.UriSchemeHttp && e.Uri.Scheme != Uri.UriSchemeHttps)) return;
+            try { Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true }); }
+            catch { /* An unavailable browser must not close the result window. */ }
+        }
+
+        private sealed class UiProgress : IProgress<string>
+        {
+            private readonly Dispatcher dispatcher;
+            private readonly Action<string> update;
+
+            public UiProgress(Dispatcher dispatcher, Action<string> update)
+            { this.dispatcher = dispatcher; this.update = update; }
+
+            public void Report(string value)
+            {
+                if (dispatcher.CheckAccess()) update(value);
+                else dispatcher.Invoke(new Action(() => update(value)));
+            }
+        }
+
         private void AddHistory(string action, string selection, string result, string application, string prompt)
         {
-            var historyAction = action;
+            var historyAction = action == "explain" ? "了解" :
+                action == "explain_detailed" ? "详细解释" : action;
             if (action != null && action.StartsWith("custom:", StringComparison.Ordinal))
             {
                 var id = action.Substring("custom:".Length);
