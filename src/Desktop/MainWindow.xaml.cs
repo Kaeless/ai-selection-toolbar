@@ -532,12 +532,13 @@ namespace AiSelectionToolbar.Desktop
                 .Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             var typeface = new Typeface(new System.Windows.Media.FontFamily("Segoe UI"),
                 FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var longest = 0d;
             foreach (var line in lines)
             {
                 if (line.Length == 0) continue;
                 var measured = new FormattedText(line, CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight, typeface, 14, System.Windows.Media.Brushes.Black);
+                    FlowDirection.LeftToRight, typeface, 14, System.Windows.Media.Brushes.Black, pixelsPerDip);
                 longest = Math.Max(longest, measured.WidthIncludingTrailingWhitespace);
             }
             var targetWidth = Math.Min(maxWidth, Math.Max(380, Math.Min(650, longest + 100)));
@@ -555,7 +556,7 @@ namespace AiSelectionToolbar.Desktop
                 var fontSize = line.StartsWith("# ", StringComparison.Ordinal) ? 20 :
                     line.StartsWith("## ", StringComparison.Ordinal) ? 17 : 14;
                 var measured = new FormattedText(line, CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight, typeface, fontSize, System.Windows.Media.Brushes.Black) {
+                    FlowDirection.LeftToRight, typeface, fontSize, System.Windows.Media.Brushes.Black, pixelsPerDip) {
                     MaxTextWidth = contentWidth - (inCode ? 12 : 0)
                 };
                 contentHeight += Math.Max(inCode ? 19 : 22, measured.Height) + (inCode ? 1 : 7);
