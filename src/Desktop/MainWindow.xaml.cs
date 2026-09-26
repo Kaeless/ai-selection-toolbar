@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -33,6 +34,7 @@ namespace AiSelectionToolbar.Desktop
         private double _compactWidth = 520;
         private double _compactHeight = 62;
         private readonly StringBuilder _rawResult = new StringBuilder();
+        private bool _receivedReasoning;
         private readonly DispatcherTimer _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
         private readonly DispatcherTimer _dismissTimer = new DispatcherTimer {
             Interval = TimeSpan.FromSeconds(8)
@@ -63,11 +65,11 @@ namespace AiSelectionToolbar.Desktop
         public void ShowExpanded()
         {
             _dismissTimer.Stop();
-            MinWidth = 500;
-            MinHeight = 330;
-            Width = 600;
-            Height = 400;
-            ResizeMode = ResizeMode.CanResizeWithGrip;
+            MinWidth = 360;
+            MinHeight = 150;
+            Width = 420;
+            Height = 155;
+            ResizeMode = ResizeMode.NoResize;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
             Topmost = true;
@@ -190,6 +192,7 @@ namespace AiSelectionToolbar.Desktop
             NoteButton.IsEnabled = false;
             _sourceTitle = sourceTitle ?? "";
             _rawResult.Clear();
+            _receivedReasoning = false;
             _renderTimer.Stop();
             RenderResult();
             StatusLabel.Text = "已捕获选区";
@@ -297,19 +300,21 @@ namespace AiSelectionToolbar.Desktop
                 prompt = entered.Trim();
                 if (prompt.Length == 0) { MessageBox.Show(this, "问题不能为空。", "提问"); return; }
             }
-            ShowExpanded();
             CancelGeneration();
+            _rawResult.Clear();
+            _receivedReasoning = false;
+            ShowExpanded();
             var cancellation = new CancellationTokenSource();
             _generation = cancellation;
             NoteButton.IsEnabled = false;
             StopButton.IsEnabled = true;
-            _rawResult.Clear();
             RenderResult();
             StatusLabel.Text = "生成中…";
-            var progress = new Progress<string>(chunk =>
+            var progress = new UiProgress(Dispatcher, chunk =>
             {
                 if (_generation != cancellation || cancellation.IsCancellationRequested) return;
-                _rawResult.Append(chunk);
+                if (chunk == null) _receivedReasoning = true;
+                else _rawResult.Append(chunk);
                 if (!_renderTimer.IsEnabled) _renderTimer.Start();
             });
             try
@@ -318,17 +323,30 @@ namespace AiSelectionToolbar.Desktop
                 if (_generation == cancellation)
                 {
                     _renderTimer.Stop();
+                    var hasAnswer = _rawResult.Length > 0;
+                    if (!hasAnswer)
+                        _rawResult.Append("模型未返回回答正文，请重试或切换模型。");
                     RenderResult();
-                    StatusLabel.Text = "完成";
-                    if (action == "explain" || action == "explain_detailed")
+                    StatusLabel.Text = hasAnswer ? "完成" : "无回答正文";
+                    if (hasAnswer && (action == "explain" || action == "explain_detailed"))
                     {
                         _lastExplanation = _rawResult.ToString();
                         NoteButton.IsEnabled = !string.IsNullOrWhiteSpace(_lastExplanation);
                     }
-                    AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, prompt);
+                    if (hasAnswer)
+                        AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, prompt);
                 }
             }
-            catch (OperationCanceledException) { if (_generation == cancellation) StatusLabel.Text = "已停止"; }
+            catch (OperationCanceledException)
+            {
+                if (_generation == cancellation)
+                {
+                    _renderTimer.Stop();
+                    _rawResult.Append((_rawResult.Length == 0 ? "" : "\n\n") + "模型响应超时，请重试。");
+                    RenderResult();
+                    StatusLabel.Text = "请求超时";
+                }
+            }
             catch (Exception ex)
             {
                 if (_generation == cancellation)
@@ -431,7 +449,7 @@ namespace AiSelectionToolbar.Desktop
             };
             if (markdown.Length == 0)
             {
-                document.Blocks.Add(new Paragraph(new Run("正在生成…")) {
+                document.Blocks.Add(new Paragraph(new Run(_receivedReasoning ? "模型正在思考，等待回答正文…" : "正在生成…")) {
                     Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(135, 147, 164)) });
             }
             else
@@ -493,6 +511,62 @@ namespace AiSelectionToolbar.Desktop
             }
             ResultView.Document = document;
             ResultView.ScrollToEnd();
+            ResizeAnswerToContent(markdown);
+        }
+
+        private void ResizeAnswerToContent(string markdown)
+        {
+            if (ExpandedPanel.Visibility != Visibility.Visible) return;
+            var area = System.Windows.Forms.Screen.FromRectangle(_selectionBounds.IsEmpty
+                ? System.Windows.Forms.Screen.PrimaryScreen.WorkingArea : _selectionBounds).WorkingArea;
+            var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+            var topLeft = transform.HasValue
+                ? transform.Value.Transform(new System.Windows.Point(area.Left, area.Top))
+                : new System.Windows.Point(SystemParameters.WorkArea.Left, SystemParameters.WorkArea.Top);
+            var bottomRight = transform.HasValue
+                ? transform.Value.Transform(new System.Windows.Point(area.Right, area.Bottom))
+                : new System.Windows.Point(SystemParameters.WorkArea.Right, SystemParameters.WorkArea.Bottom);
+            var maxWidth = Math.Max(360, bottomRight.X - topLeft.X - 24);
+            var maxHeight = Math.Max(150, bottomRight.Y - topLeft.Y - 24);
+            var lines = (markdown.Length == 0 ? "正在生成…" : markdown)
+                .Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            var typeface = new Typeface(new System.Windows.Media.FontFamily("Segoe UI"),
+                FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+            var longest = 0d;
+            foreach (var line in lines)
+            {
+                if (line.Length == 0) continue;
+                var measured = new FormattedText(line, CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, typeface, 14, System.Windows.Media.Brushes.Black);
+                longest = Math.Max(longest, measured.WidthIncludingTrailingWhitespace);
+            }
+            var targetWidth = Math.Min(maxWidth, Math.Max(380, Math.Min(650, longest + 100)));
+            Width = targetWidth;
+
+            var contentWidth = Math.Max(220, targetWidth - 95);
+            var contentHeight = 0d;
+            var inCode = false;
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
+                { inCode = !inCode; contentHeight += 8; continue; }
+                if (string.IsNullOrWhiteSpace(line))
+                { contentHeight += 4; continue; }
+                var fontSize = line.StartsWith("# ", StringComparison.Ordinal) ? 20 :
+                    line.StartsWith("## ", StringComparison.Ordinal) ? 17 : 14;
+                var measured = new FormattedText(line, CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight, typeface, fontSize, System.Windows.Media.Brushes.Black) {
+                    MaxTextWidth = contentWidth - (inCode ? 12 : 0)
+                };
+                contentHeight += Math.Max(inCode ? 19 : 22, measured.Height) + (inCode ? 1 : 7);
+            }
+            // Header, outer margins, document padding and result surface.
+            Height = Math.Min(maxHeight, Math.Max(150, Math.Ceiling(contentHeight + 122)));
+            if (IsVisible)
+            {
+                Left = Math.Max(topLeft.X, Math.Min(Left, bottomRight.X - Width));
+                Top = Math.Max(topLeft.Y, Math.Min(Top, bottomRight.Y - Height));
+            }
         }
 
         private static bool TryListItem(string line, out bool ordered, out string content)
@@ -576,6 +650,21 @@ namespace AiSelectionToolbar.Desktop
             if (e.Uri == null || (e.Uri.Scheme != Uri.UriSchemeHttp && e.Uri.Scheme != Uri.UriSchemeHttps)) return;
             try { Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true }); }
             catch { /* An unavailable browser must not close the result window. */ }
+        }
+
+        private sealed class UiProgress : IProgress<string>
+        {
+            private readonly Dispatcher dispatcher;
+            private readonly Action<string> update;
+
+            public UiProgress(Dispatcher dispatcher, Action<string> update)
+            { this.dispatcher = dispatcher; this.update = update; }
+
+            public void Report(string value)
+            {
+                if (dispatcher.CheckAccess()) update(value);
+                else dispatcher.Invoke(new Action(() => update(value)));
+            }
         }
 
         private void AddHistory(string action, string selection, string result, string application, string prompt)

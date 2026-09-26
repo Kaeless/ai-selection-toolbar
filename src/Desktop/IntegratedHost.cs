@@ -132,7 +132,11 @@ namespace AiSelectionToolbar.Desktop
             var text = action == "ask" ? "选中文字：\n" + selection + "\n\n问题：\n" + prompt : selection;
             await chat.StreamAsync(current, apiKey, new[] {
                 new ChatMessage("system", instruction), new ChatMessage("user", text)
-            }, delta => { if (!string.IsNullOrEmpty(delta.Text)) chunks.Report(delta.Text); return Task.CompletedTask; },
+            }, delta => {
+                if (!string.IsNullOrEmpty(delta.Text)) chunks.Report(delta.Text);
+                else if (delta.IsReasoning) chunks.Report(null);
+                return Task.CompletedTask;
+            },
                 cancellationToken).ConfigureAwait(false);
         }
 

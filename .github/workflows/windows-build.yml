@@ -32,7 +32,7 @@ jobs:
           if (!(Test-Path "$release/x64/SQLite.Interop.dll")) { throw 'SQLite x64 native library missing' }
           if (!(Test-Path "$release/System.Data.SQLite.dll")) { throw 'SQLite managed library missing' }
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Compress-Archive -Path "$release/*" -DestinationPath 'dist/AISelectionToolbar-0.3.1-win-x64-portable.zip' -Force
+          Compress-Archive -Path "$release/*" -DestinationPath 'dist/AISelectionToolbar-0.3.2-win-x64-portable.zip' -Force
       - name: Package installer
         shell: pwsh
         run: |
@@ -44,6 +44,18 @@ jobs:
       - name: Smoke test portable and installer packages
         shell: pwsh
         run: ./tests/windows-package-smoke.ps1
+      - name: Smoke test reasoning and answer stream
+        shell: pwsh
+        run: |
+          $release = (Resolve-Path 'src/Desktop/bin/Release').Path
+          $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+          & $compiler /nologo /target:exe /out:"$release/ChatStreamSmoke.exe" `
+            /reference:"$release/AiSelectionToolbar.Desktop.exe" /reference:System.Net.Http.dll `
+            tests/ChatStreamSmoke.cs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$release/ChatStreamSmoke.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item "$release/ChatStreamSmoke.exe"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64-packages
@@ -51,6 +63,6 @@ jobs:
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
-          name: AISelectionToolbar-0.3.1-win-x64-setup
-          path: dist/AISelectionToolbar-0.3.1-win-x64-setup.exe
+          name: AISelectionToolbar-0.3.2-win-x64-setup
+          path: dist/AISelectionToolbar-0.3.2-win-x64-setup.exe
           if-no-files-found: error

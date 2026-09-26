@@ -60,6 +60,7 @@ namespace AiSelectionToolbar.Core
     {
         public string Text { get; set; }
         public string FinishReason { get; set; }
+        public bool IsReasoning { get; set; }
     }
 
     public sealed class HistoryEntry

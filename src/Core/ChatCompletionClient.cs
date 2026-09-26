@@ -160,12 +160,15 @@ namespace AiSelectionToolbar.Core
             {
                 if (choice == null) continue;
                 if (!string.IsNullOrEmpty(choice.FinishReason)) finished = true;
-                if (choice.Delta != null && !string.IsNullOrEmpty(choice.Delta.Content) ||
+                if ((choice.Delta != null &&
+                    (!string.IsNullOrEmpty(choice.Delta.Content) || !string.IsNullOrEmpty(choice.Delta.ReasoningContent))) ||
                     !string.IsNullOrEmpty(choice.FinishReason))
                     await callback(new ChatDelta
                     {
                         Text = choice.Delta?.Content,
-                        FinishReason = choice.FinishReason
+                        FinishReason = choice.FinishReason,
+                        IsReasoning = !string.IsNullOrEmpty(choice.Delta?.ReasoningContent) &&
+                            string.IsNullOrEmpty(choice.Delta?.Content)
                     }).ConfigureAwait(false);
             }
             return finished ? CompletionSignal.Finished : CompletionSignal.None;
@@ -202,6 +205,7 @@ namespace AiSelectionToolbar.Core
         private sealed class DeltaBody
         {
             [DataMember(Name = "content")] public string Content { get; set; }
+            [DataMember(Name = "reasoning_content")] public string ReasoningContent { get; set; }
         }
         [DataContract]
         private sealed class ErrorBody
