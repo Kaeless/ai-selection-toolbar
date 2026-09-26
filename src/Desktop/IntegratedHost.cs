@@ -130,6 +130,8 @@ namespace AiSelectionToolbar.Desktop
                     break;
             }
             var text = action == "ask" ? "选中文字：\n" + selection + "\n\n问题：\n" + prompt : selection;
+            if (action == "explain_detailed" && current.TimeoutSeconds < 300)
+                current.TimeoutSeconds = 300;
             await chat.StreamAsync(current, apiKey, new[] {
                 new ChatMessage("system", instruction), new ChatMessage("user", text)
             }, delta => {
