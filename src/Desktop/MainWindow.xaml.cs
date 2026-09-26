@@ -117,6 +117,7 @@ namespace AiSelectionToolbar.Desktop
                 }
             }
             var compact = string.Equals(settings.ToolbarStyle, "compact", StringComparison.Ordinal);
+            QuickCustomActions.Margin = compact ? new Thickness(0) : new Thickness(0, 0, 3, 0);
             QuickButtonStrip.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
             var chrome = QuickScroll.Padding.Left + QuickScroll.Padding.Right +
                 QuickPanel.BorderThickness.Left + QuickPanel.BorderThickness.Right +
@@ -132,7 +133,6 @@ namespace AiSelectionToolbar.Desktop
             _compactWidth = Math.Min(requiredWidth, Math.Max(160, maxWidth));
             var overflow = requiredWidth > _compactWidth;
             _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
-            QuickCustomActions.Margin = compact ? new Thickness(0) : new Thickness(0, 0, 3, 0);
             QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
                 new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
         }
