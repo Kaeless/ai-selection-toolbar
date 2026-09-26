@@ -70,7 +70,7 @@ namespace AiSelectionToolbar.Desktop
             ResizeMode = ResizeMode.CanResizeWithGrip;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
-            Topmost = false;
+            Topmost = true;
             if (IsVisible)
             {
                 if (!_selectionBounds.IsEmpty) PositionNearSelection(_selectionBounds);
@@ -176,6 +176,11 @@ namespace AiSelectionToolbar.Desktop
             var processName = NormalizeApplicationName(sourceApplication);
             if (GetSettings().ExcludedApplications.Any(x =>
                 string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase))) return;
+            // Clicking a button can leave the source app foreground with its old selection.
+            // A second mouse-up must not replace an open answer or cancel its stream.
+            if (IsVisible && ExpandedPanel.Visibility == Visibility.Visible &&
+                string.Equals(_selectedText, text, StringComparison.Ordinal) &&
+                string.Equals(_sourceApplication, sourceApplication, StringComparison.OrdinalIgnoreCase)) return;
             CancelGeneration();
             _selectionBounds = bounds;
             ShowCompact();

@@ -127,19 +127,41 @@ async function loadHistory() {
   const items = await api("/api/history?search=" + encodeURIComponent(query) + "&offset=" + offset);
   if (request !== historyRequest) return;
   const list = byId("historyList"); list.replaceChildren();
+  const index = byId("historyIndex"); index.replaceChildren();
+  byId("historyIndexCount").textContent = items.length ? "· " + items.length + " 条" : "";
   byId("historyPage").textContent = "第 " + (Math.floor(offset / 50) + 1) + " 页";
   byId("historyPrev").disabled = offset === 0;
   byId("historyNext").disabled = items.length < 50;
-  if (!items.length) { const empty = document.createElement("div"); empty.className = "card empty"; empty.textContent = "没有匹配的历史记录"; list.append(empty); return; }
-  for (const item of items) {
+  if (!items.length) {
+    const empty = document.createElement("div"); empty.className = "card empty"; empty.textContent = "没有匹配的历史记录"; list.append(empty);
+    index.textContent = "本页没有记录"; return;
+  }
+  let previousDate = "";
+  items.forEach((item, position) => {
     const card = document.createElement("article"); card.className = "entry";
+    card.id = "history-entry-" + request + "-" + position;
     const meta = document.createElement("div"); meta.className = "meta";
     const dateValue = typeof item.TimeUtc === "string" ? Number(item.TimeUtc.match(/\d+/)?.[0] || 0) : item.TimeUtc;
+    const date = new Date(dateValue);
+    const dateLabel = isNaN(date.getTime()) ? "日期未知" : date.toLocaleDateString();
+    if (dateLabel !== previousDate) {
+      const group = document.createElement("div"); group.className = "history-index-date"; group.textContent = dateLabel;
+      index.append(group); previousDate = dateLabel;
+    }
     const configuredAction = (item.Action || "").startsWith("custom:")
       ? customActions.find(x => x.Id === item.Action.slice(7)) : null;
     const actionName = (item.Action || "").startsWith("custom:")
       ? "自定义 · " + (configuredAction?.Name || "操作") : (item.Action || "操作");
-    meta.textContent = new Date(dateValue).toLocaleString() + "  ·  " + actionName + "  ·  " + (item.Application || "未知程序");
+    meta.textContent = (isNaN(date.getTime()) ? dateLabel : date.toLocaleString()) + "  ·  " + actionName + "  ·  " + (item.Application || "未知程序");
+    const jump = document.createElement("button"); jump.type = "button";
+    const title = document.createElement("strong"); title.textContent = (item.Selection || "").replace(/\s+/g, " ").trim() || "未命名记录";
+    const subtitle = document.createElement("small"); subtitle.textContent = actionName;
+    jump.append(title, subtitle);
+    jump.addEventListener("click", () => {
+      for (const button of index.querySelectorAll("button")) button.classList.remove("active");
+      jump.classList.add("active"); card.scrollIntoView({behavior: "smooth", block: "start"});
+    });
+    index.append(jump);
     const selection = document.createElement("div"); selection.className = "selection"; selection.textContent = item.Selection || "";
     card.append(meta, selection);
     if (item.Prompt) { const question = document.createElement("div"); question.className = "question"; question.textContent = "提问：" + item.Prompt; card.append(question); }
@@ -151,7 +173,7 @@ async function loadHistory() {
       await api("/api/history/delete", "POST", {id: item.Id}); await loadHistory(); status("已删除历史记录");
     }));
     footer.append(remove); card.append(result, footer); list.append(card);
-  }
+  });
 }
 
 for (const [name, [tab]] of Object.entries(sections)) byId(tab).addEventListener("click", () => showSection(name));

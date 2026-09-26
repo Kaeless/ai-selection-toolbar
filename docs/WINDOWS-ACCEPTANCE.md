@@ -24,7 +24,7 @@
 | 安装包和便携 ZIP 的 SHA-256 | 待填 |
 | 测试人、日期 | 待填 |
 
-在 PowerShell 中可运行：`(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full').Release`、`Get-FileHash .\AISelectionToolbar-0.3.0-win-x64-setup.exe -Algorithm SHA256`。从同一次 CI 运行的 `windows-x64-packages` 工件中取得两个包。
+在 PowerShell 中可运行：`(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full').Release`、`Get-FileHash .\AISelectionToolbar-0.3.1-win-x64-setup.exe -Algorithm SHA256`。从同一次 CI 运行的 `windows-x64-packages` 工件中取得两个包。
 
 ## 每台机器的操作
 
@@ -46,6 +46,8 @@
 | v0.3 结果窗 | 点击了解/详细解释，仅显示回答及必要控件，无程序标题、选区和演示按钮 | 待测 | 待测 |
 | v0.3 Markdown | 通过流式响应检查标题、粗体、列表、代码、链接的排版；原始历史文本仍完整 | 待测 | 待测 |
 | v0.3 双提示词 | 同一选区分别执行了解、详细解释，比较答案长度和层次，并确认笔记仍可保存 | 待测 | 待测 |
+| v0.3.1 详细解释 | 在浏览器中选择文字，点击详细解释；结果窗保持可见，原选区的重复捕获不会重置流式回答 | 待测 | 待测 |
+| v0.3.1 历史索引 | 搜索、翻页、删除记录后，侧栏索引与当前页同步；点击索引可跳到对应记录 | 待测 | 待测 |
 | 卸载 | 卸载安装版，程序文件及属于该安装路径的启动项清除；确认用户历史与笔记仍可访问 | 待测 | 待测 |
 
 在下面每个程序中记录版本。用鼠标拖选一段可复制文字并松开，核对工具栏位置与捕获文本；再用键盘选中文字后按 Ctrl+Shift+Space。分别检查网页标题或文档名、PDF 可选文本、跨进程焦点场景，以及单击非文字区域后不会误用旧选区。
