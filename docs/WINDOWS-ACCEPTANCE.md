@@ -2,7 +2,7 @@
 
 ## 已执行的 Windows CI 验证
 
-`windows-2022` GitHub 托管运行器的 [构建记录](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36078220310)已通过：
+`windows-2022` GitHub 托管运行器的 [v0.2 构建记录](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36209933568)已通过：
 
 - Release x64 编译，以及便携 ZIP 和 Inno Setup 安装包构建。
 - 便携版解压与安装包静默安装；两种目录中的 SQLite 原生库加载和数据库读写。

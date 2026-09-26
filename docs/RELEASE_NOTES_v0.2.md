@@ -16,4 +16,4 @@
 
 ## 下载与安装
 
-GitHub Actions 的 `AISelectionToolbar-0.2.0-win-x64-setup` 工件中包含安装 EXE；`windows-x64-packages` 同时包含安装 EXE 和便携 ZIP。退出托盘中的旧版程序后运行安装包即可覆盖安装；安装前需 .NET Framework 4.8 或更高版本。
+[v0.2 Windows 构建](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36209933568)已通过编译、安装/卸载、便携版启动与 SQLite 基础检查。其中 [`AISelectionToolbar-0.2.0-win-x64-setup`](https://github.com/Kaeless/ai-selection-toolbar/actions/runs/36209933568/artifacts/10894374309) 工件包含安装 EXE；`windows-x64-packages` 同时包含安装 EXE 和便携 ZIP。退出托盘中的旧版程序后运行安装包即可覆盖安装；安装前需 .NET Framework 4.8 或更高版本。
