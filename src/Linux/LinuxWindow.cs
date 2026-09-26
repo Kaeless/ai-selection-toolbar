@@ -80,7 +80,7 @@ public sealed class LinuxWindow : IDisposable
         answer.Add(answerBox);
         answer.DeleteEvent += (_, e) => { activeRequest?.Cancel(); answer.Hide(); e.RetVal = true; };
 
-        tray = new StatusIcon { IconName = "accessories-text-editor", Tooltip = "AI 划词助手", Visible = true };
+        tray = new StatusIcon { IconName = "accessories-text-editor", TooltipText = "AI 划词助手", Visible = true };
         tray.Activate += (_, _) => ShowManagement();
         tray.PopupMenu += (_, args) =>
         {
