@@ -4,7 +4,7 @@
 
 ## 模块
 
-- `src/Selection/`：全局鼠标拖选和 Ctrl+Shift+Space 快捷键触发，先排除程序，再通过 Windows UI Automation 获取可选中的文字和位置。没有 `TextPattern` 的程序不会返回文字。
+- `src/Selection/`：全局鼠标拖选和 Ctrl+Shift+Space 快捷键触发；先检查前台与焦点进程的排除名单，再通过 Windows UI Automation `TextPattern` 获取选区。标准 Unicode Win32 `Edit` 控件可走 `EM_GETSEL`/`WM_GETTEXT` 有界消息回退；不读取密码控件，不通过模拟复制改变剪贴板。
 - `src/Core/`：OpenAI 兼容的流式请求和取消、DPAPI 加密的 API 密钥、SQLite 历史、Markdown 笔记。
 - `src/Desktop/`：.NET Framework 4.8 WPF 浮窗，以及只监听 `127.0.0.1` 的本机设置与历史管理页。管理页通过随机会话令牌访问本机 API。
 
@@ -31,7 +31,7 @@ CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含安�
 ## 必须在 Windows 验证
 
 1. Win7 SP1 x64 与 Win11：启动、SQLite 原生库加载、配置与管理页；验证本机管理页无法从其他设备访问。
-2. Chrome、Edge、Firefox、Word、PowerPoint、Adobe Acrobat Reader：拖选后的文字、位置、标题及排除程序。UI Automation provider 的能力由应用版本决定；扫描版 PDF 不在首版范围。
+2. Chrome、Edge、Firefox、Word、PowerPoint、Adobe Acrobat Reader 及其他目标程序：拖选后的文字、位置、标题及排除程序。UI Automation provider 的能力由应用版本决定；标准 Edit 回退仅有控件边界而非字形位置，自绘编辑器、无 TextPattern provider 的控件与扫描版 PDF 无法保证取词。
 3. 云端或本地兼容 API：流式结果、停止、错误与首次未配置时不发送；历史分页搜索/删除/清空、笔记按日追加和重复提醒。
 4. 安装包和便携版的启动、卸载及文件完整性；登录启动开关和自定义笔记目录。检查更新及其提示仍待实现。
 

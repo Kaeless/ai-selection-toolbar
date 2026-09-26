@@ -9,6 +9,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Media;
+using AiSelectionToolbar.Core;
 
 namespace AiSelectionToolbar.Desktop
 {
@@ -24,6 +26,8 @@ namespace AiSelectionToolbar.Desktop
         private string _lastExplanation;
         private string _sourceTitle = "";
         private Rectangle _selectionBounds;
+        private double _compactWidth = 430;
+        private double _compactHeight = 62;
         private readonly DispatcherTimer _dismissTimer = new DispatcherTimer {
             Interval = TimeSpan.FromSeconds(8)
         };
@@ -52,10 +56,10 @@ namespace AiSelectionToolbar.Desktop
         public void ShowExpanded()
         {
             _dismissTimer.Stop();
-            MinWidth = 420;
-            MinHeight = 320;
-            Width = 500;
-            Height = 380;
+            MinWidth = 480;
+            MinHeight = 380;
+            Width = 540;
+            Height = 430;
             ResizeMode = ResizeMode.CanResizeWithGrip;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
@@ -76,14 +80,55 @@ namespace AiSelectionToolbar.Desktop
         private void ShowCompact()
         {
             _dismissTimer.Stop();
+            RefreshToolbarAppearance();
             ResizeMode = ResizeMode.NoResize;
-            MinWidth = 275;
-            MinHeight = 60;
-            Width = 275;
-            Height = 60;
+            MinWidth = _compactWidth;
+            MinHeight = _compactHeight;
+            Width = _compactWidth;
+            Height = _compactHeight;
             ExpandedPanel.Visibility = Visibility.Collapsed;
             QuickPanel.Visibility = Visibility.Visible;
             Topmost = true;
+        }
+
+        private void RefreshToolbarAppearance()
+        {
+            var settings = GetSettings();
+            System.Windows.Media.Color accent;
+            try { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarAccentColor ?? "#4F46E5"); }
+            catch { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4F46E5"); }
+            var brush = new SolidColorBrush(accent);
+            AccentBadge.Background = brush;
+            ExpandedAccentBadge.Background = brush;
+            QuickCustomActions.Children.Clear();
+            ExpandedCustomActions.Children.Clear();
+            var customWidth = 0d;
+            if (settings.CustomActions != null)
+            {
+                foreach (var custom in settings.CustomActions)
+                {
+                    if (custom == null || string.IsNullOrWhiteSpace(custom.Id) ||
+                        string.IsNullOrWhiteSpace(custom.Name)) continue;
+                    QuickCustomActions.Children.Add(CreateCustomButton(custom));
+                    ExpandedCustomActions.Children.Add(CreateCustomButton(custom));
+                    customWidth += Math.Min(156, 28 + custom.Name.Length * 15);
+                }
+            }
+            var compact = string.Equals(settings.ToolbarStyle, "compact", StringComparison.Ordinal);
+            var overflow = 430 + customWidth > 760;
+            _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
+            _compactWidth = Math.Max(430, Math.Min(760, 430 + customWidth));
+            QuickCustomActions.Margin = compact ? new Thickness(0) : new Thickness(0, 0, 3, 0);
+            QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
+                new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
+        }
+
+        private Button CreateCustomButton(CustomActionDefinition custom)
+        {
+            var button = new Button { Content = custom.Name, Tag = "custom:" + custom.Id,
+                ToolTip = "自定义操作：" + custom.Name, MaxWidth = 156 };
+            button.Click += Action_Click;
+            return button;
         }
 
         // A composition root may attach a source that publishes SelectionSnapshot values.
@@ -114,8 +159,9 @@ namespace AiSelectionToolbar.Desktop
             }
             if (string.IsNullOrWhiteSpace(text)) return;
             sourceApplication = sourceApplication ?? "未知程序";
+            var processName = NormalizeApplicationName(sourceApplication);
             if (GetSettings().ExcludedApplications.Any(x =>
-                string.Equals(x, sourceApplication, StringComparison.OrdinalIgnoreCase))) return;
+                string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase))) return;
             CancelGeneration();
             _selectionBounds = bounds;
             ShowCompact();
@@ -150,6 +196,7 @@ namespace AiSelectionToolbar.Desktop
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            RefreshToolbarAppearance();
             Left = Math.Max(0, SystemParameters.WorkArea.Right - Width - 24);
             Top = Math.Max(0, SystemParameters.WorkArea.Bottom - Height - 24);
             _server = new LocalManagementServer(GetSettings, UpdateSettings, GetHistory,
@@ -178,6 +225,21 @@ namespace AiSelectionToolbar.Desktop
             _dismissTimer.Stop();
             CancelGeneration();
             Hide();
+        }
+
+        private void ExcludeCurrent_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                AddExclusion(_sourceApplication);
+                _dismissTimer.Stop();
+                Hide();
+            }
+            catch (Exception ex)
+            {
+                ShowExpanded();
+                StatusLabel.Text = "无法排除程序：" + ex.Message;
+            }
         }
 
         private void Demo_Click(object sender, RoutedEventArgs e)
@@ -314,7 +376,15 @@ namespace AiSelectionToolbar.Desktop
 
         private void AddHistory(string action, string selection, string result, string application, string prompt)
         {
-            var item = new HistoryItem { TimeUtc = DateTime.UtcNow, Action = action,
+            var historyAction = action;
+            if (action != null && action.StartsWith("custom:", StringComparison.Ordinal))
+            {
+                var id = action.Substring("custom:".Length);
+                var configured = GetSettings().CustomActions;
+                var match = configured == null ? null : configured.FirstOrDefault(x => x.Id == id);
+                historyAction = "自定义 · " + (match == null ? "操作" : match.Name);
+            }
+            var item = new HistoryItem { TimeUtc = DateTime.UtcNow, Action = historyAction,
                 Selection = selection, Result = result, Application = application,
                 SourceTitle = _sourceTitle, Prompt = prompt };
             if (SaveHistoryItem != null) { SaveHistoryItem(item); return; }
@@ -334,12 +404,16 @@ namespace AiSelectionToolbar.Desktop
                     AutoShow = external.AutoShow, TargetLanguage = external.TargetLanguage,
                     StartOnLogin = external.StartOnLogin, NotesDirectory = external.NotesDirectory,
                     ApiBaseUrl = external.ApiBaseUrl, Model = external.Model,
+                    CustomActions = new List<CustomActionDefinition>(external.CustomActions ?? new List<CustomActionDefinition>()),
+                    ToolbarStyle = external.ToolbarStyle, ToolbarAccentColor = external.ToolbarAccentColor,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
             }
             lock (_stateLock) return new DesktopSettings { AutoShow = _settings.AutoShow,
                 TargetLanguage = _settings.TargetLanguage,
                 StartOnLogin = _settings.StartOnLogin, NotesDirectory = _settings.NotesDirectory,
                 ApiBaseUrl = _settings.ApiBaseUrl, Model = _settings.Model,
+                CustomActions = new List<CustomActionDefinition>(_settings.CustomActions ?? new List<CustomActionDefinition>()),
+                ToolbarStyle = _settings.ToolbarStyle, ToolbarAccentColor = _settings.ToolbarAccentColor,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };
         }
 
@@ -350,6 +424,9 @@ namespace AiSelectionToolbar.Desktop
             current.TargetLanguage = value.TargetLanguage;
             current.StartOnLogin = value.StartOnLogin;
             current.NotesDirectory = value.NotesDirectory;
+            current.CustomActions = value.CustomActions ?? new List<CustomActionDefinition>();
+            current.ToolbarStyle = value.ToolbarStyle;
+            current.ToolbarAccentColor = value.ToolbarAccentColor;
             PersistSettings(current);
         }
 
@@ -366,6 +443,7 @@ namespace AiSelectionToolbar.Desktop
         {
             lock (_stateLock) _settings = settings;
             if (SaveSettings != null) SaveSettings(settings);
+            Dispatcher.BeginInvoke(new Action(RefreshToolbarAppearance));
         }
 
         private HistoryItem[] GetHistory(string term, int offset)
@@ -378,17 +456,29 @@ namespace AiSelectionToolbar.Desktop
 
         private void AddExclusion(string application)
         {
+            var processName = NormalizeApplicationName(application);
+            if (processName.Length == 0) throw new ArgumentException("程序名不能为空。", nameof(application));
             var current = GetSettings();
-            if (!current.ExcludedApplications.Any(x => string.Equals(x, application, StringComparison.OrdinalIgnoreCase)))
-                current.ExcludedApplications.Add(application);
+            if (!current.ExcludedApplications.Any(x => string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase)))
+                current.ExcludedApplications.Add(processName + ".exe");
             PersistSettings(current);
         }
 
         private void RemoveExclusion(string application)
         {
+            var processName = NormalizeApplicationName(application);
             var current = GetSettings();
-            current.ExcludedApplications.RemoveAll(x => string.Equals(x, application, StringComparison.OrdinalIgnoreCase));
+            current.ExcludedApplications.RemoveAll(x => string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase));
             PersistSettings(current);
+        }
+
+        private static string NormalizeApplicationName(string application)
+        {
+            var name = (application ?? "").Trim().Trim('"');
+            var slash = name.LastIndexOfAny(new[] { '\\', '/' });
+            if (slash >= 0) name = name.Substring(slash + 1);
+            return name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                ? name.Substring(0, name.Length - 4) : name;
         }
     }
 }

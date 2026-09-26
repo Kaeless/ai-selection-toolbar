@@ -3,42 +3,72 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI 划词工具栏 · 本机管理</title>
+  <title>AI 划词工具栏 · 管理</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <main>
-    <header><h1>AI 划词工具栏</h1><p>本机设置与历史记录</p></header>
-    <nav><button id="settingsTab" class="selected">设置</button><button id="historyTab">历史记录</button></nav>
-    <section id="settingsPanel">
-      <h2>常规设置</h2>
-      <label class="check"><input id="autoShow" type="checkbox"> 捕获选中文字时显示浮窗</label>
-      <label class="check"><input id="startOnLogin" type="checkbox"> 登录 Windows 后自动启动（仅当前用户）</label>
-      <p class="hint">默认关闭。便携版移动到新目录后，需手动运行一次程序以更新启动路径。</p>
-      <label>翻译目标语言 <input id="language" maxlength="50" placeholder="中文"></label>
-      <label>笔记保存目录 <input id="notesDirectory" maxlength="2048" placeholder="C:\Users\...\Documents\AiSelectionToolbar\Notes"></label>
-      <p class="hint">输入绝对目录路径；修改后新笔记立即保存到该目录。</p>
-      <button id="saveSettings">保存设置</button>
-      <h2>模型连接</h2>
-      <label>API 地址 <input id="apiBaseUrl" type="url" maxlength="2048" placeholder="https://example.com/v1"></label>
-      <p class="hint">远程地址须使用 HTTPS；本机 127.0.0.1 或 localhost 可使用 HTTP。</p>
-      <label>模型名称 <input id="model" maxlength="200" placeholder="模型标识"></label>
-      <label>API key <input id="apiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="仅提交，不回显"></label>
-      <button id="saveConnection">提交连接配置</button>
-      <p class="hint">密钥保存在本机，设置页不会回显。同一地址留空会保留原密钥；更换地址时留空会清除原密钥。</p>
-      <h2>排除程序</h2>
-      <p class="hint">填写来源程序名，例如 notepad.exe。排除后，该程序的选区不会更新浮窗。</p>
-      <div class="inline"><input id="excludedInput" maxlength="200" placeholder="程序名"><button id="addExclusion">添加</button></div>
-      <ul id="excludedList"></ul>
-    </section>
-    <section id="historyPanel" hidden>
-      <h2>历史记录</h2><p class="hint">解释、翻译、提问与已确认的笔记。</p>
-      <div class="inline"><input id="historySearch" placeholder="搜索选区、问题或回答"><button id="clearHistory">清空全部</button></div>
-      <div id="historyList"></div>
-      <div class="inline"><button id="historyPrev">上一页</button><span id="historyPage"></span><button id="historyNext">下一页</button></div>
-    </section>
-    <p id="status" role="status" aria-live="polite"></p>
-  </main>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">A</span><span>AI 划词工具栏<small>本机管理</small></span></div>
+      <p class="nav-caption">工作台</p>
+      <nav aria-label="管理导航">
+        <button id="settingsTab" class="nav-item selected" type="button"><span class="nav-icon">◫</span>常规设置</button>
+        <button id="toolbarTab" class="nav-item" type="button"><span class="nav-icon">✦</span>工具栏</button>
+        <button id="historyTab" class="nav-item" type="button"><span class="nav-icon">◷</span>历史记录</button>
+        <button id="exclusionsTab" class="nav-item" type="button"><span class="nav-icon">◎</span>排除程序</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="local-dot"></span>仅在本机运行<br><small>设置与历史保存在当前用户环境</small></div>
+    </aside>
+    <main class="main">
+      <header class="page-header"><div><p class="eyebrow">AI SELECTION TOOLBAR</p><h1 id="pageTitle">常规设置</h1><p id="pageSubtitle">让划词后的下一步更顺手。</p></div><span class="version">v0.2</span></header>
+      <div class="content">
+        <section id="settingsPanel" class="panel">
+          <div class="section-head"><h2>使用偏好</h2><p>调整浮窗、翻译语言与本机笔记位置。</p></div>
+          <div class="card">
+            <label class="switch-row" for="autoShow"><span><strong>选中文字后显示工具栏</strong><small>在支持取词的程序中自动显示</small></span><input id="autoShow" type="checkbox"></label>
+            <label class="switch-row" for="startOnLogin"><span><strong>登录 Windows 后自动启动</strong><small>仅当前用户；移动便携版后请手动运行一次以更新路径</small></span><input id="startOnLogin" type="checkbox"></label>
+            <div class="field"><label for="language">翻译目标语言</label><input id="language" maxlength="50" placeholder="中文"></div>
+            <div class="field"><label for="notesDirectory">笔记保存目录</label><input id="notesDirectory" maxlength="2048" placeholder="C:\Users\...\Documents\AiSelectionToolbar\Notes"><small>输入绝对路径；新笔记会立即保存到这个目录。</small></div>
+            <div class="actions"><button id="saveSettings" class="primary" type="button">保存设置</button></div>
+          </div>
+          <div class="section-head second"><h2>模型连接</h2><p>使用兼容 Chat Completions 的服务。密钥只保存在本机，不在页面回显。</p></div>
+          <div class="card">
+            <div class="field"><label for="apiBaseUrl">API 地址</label><input id="apiBaseUrl" type="url" maxlength="2048" placeholder="https://example.com/v1"><small>远程地址须使用 HTTPS；本机地址可以使用 HTTP。</small></div>
+            <div class="field"><label for="model">模型名称</label><input id="model" maxlength="200" placeholder="模型标识"></div>
+            <div class="field"><label for="apiKey">API key</label><input id="apiKey" type="password" maxlength="8192" autocomplete="new-password" placeholder="仅提交，不回显"><small>同一地址留空保留原密钥；更换地址时留空会清除原密钥。</small></div>
+            <div class="actions"><button id="saveConnection" class="primary" type="button">保存连接</button></div>
+          </div>
+        </section>
+
+        <section id="toolbarPanel" class="panel" hidden>
+          <div class="section-head"><h2>工具栏外观</h2><p>默认的解释、翻译、提问始终保留。</p></div>
+          <div class="card">
+            <div class="field"><label for="toolbarStyle">样式</label><select id="toolbarStyle"><option value="standard">标准 · 舒展</option><option value="compact">紧凑 · 轻巧</option></select></div>
+            <div class="field"><label for="toolbarColor">强调色</label><div class="color-row"><input id="toolbarColor" type="color" value="#4f46e5"><span id="colorValue">#4F46E5</span></div></div>
+            <div id="toolbarPreview" class="toolbar-preview"><span id="previewMark">A</span><span>解释</span><span>翻译</span><span>提问</span></div>
+          </div>
+          <div class="section-head second"><h2>自定义按钮</h2><p>最多 8 个。按钮名称显示在浮窗，提示词用于处理所选文字。</p></div>
+          <div class="card"><div id="customActionList"></div><button id="addCustomAction" class="secondary" type="button">＋ 添加按钮</button><div class="actions"><button id="saveToolbar" class="primary" type="button">保存工具栏</button></div></div>
+        </section>
+
+        <section id="historyPanel" class="panel" hidden>
+          <div class="section-head"><h2>历史记录</h2><p>查看解释、翻译、提问与已确认的笔记。</p></div>
+          <div class="card history-controls"><input id="historySearch" type="search" placeholder="搜索选区、问题或回答"><button id="clearHistory" class="danger-quiet" type="button">清空全部</button></div>
+          <div id="historyList"></div>
+          <div class="pagination"><button id="historyPrev" type="button">上一页</button><span id="historyPage"></span><button id="historyNext" type="button">下一页</button></div>
+        </section>
+
+        <section id="exclusionsPanel" class="panel" hidden>
+          <div class="section-head"><h2>排除程序</h2><p>不在这些程序中读取选中文字。浮窗里也可一键隐藏当前程序。</p></div>
+          <div class="card">
+            <div class="file-picker"><span><strong>选择 Windows 程序</strong><small>只读取 .exe 文件名，不上传文件内容。</small></span><button id="chooseExe" class="secondary" type="button">选择 EXE</button><input id="exeFile" type="file" accept=".exe,application/x-msdownload" hidden></div>
+            <ul id="excludedList"></ul>
+          </div>
+        </section>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </main>
+  </div>
 </body>
 </html>

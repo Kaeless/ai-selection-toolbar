@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
+using AiSelectionToolbar.Core;
 
 namespace AiSelectionToolbar.Desktop
 {
@@ -77,6 +78,9 @@ namespace AiSelectionToolbar.Desktop
         public string ApiBaseUrl { get; set; } = "";
         public string Model { get; set; } = "";
         public List<string> ExcludedApplications { get; set; } = new List<string>();
+        public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
+        public string ToolbarStyle { get; set; } = "standard";
+        public string ToolbarAccentColor { get; set; } = "#4F46E5";
     }
 
     public sealed class ApiConnectionInput

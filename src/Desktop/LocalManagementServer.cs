@@ -141,7 +141,7 @@ namespace AiSelectionToolbar.Desktop
                         { Respond(stream, 403, "text/plain", "Forbidden"); return; }
                         int length;
                         if (!headers.TryGetValue("Content-Length", out supplied) ||
-                            !int.TryParse(supplied, out length) || length < 0 || length > 16384)
+                            !int.TryParse(supplied, out length) || length < 0 || length > 65536)
                         { Respond(stream, 413, "text/plain", "Invalid body length"); return; }
                         var body = new byte[length];
                         var received = 0;
@@ -152,7 +152,7 @@ namespace AiSelectionToolbar.Desktop
                             received += count;
                         }
                         var json = Encoding.UTF8.GetString(body);
-                        var serializer = new JavaScriptSerializer { MaxJsonLength = 16384 };
+                        var serializer = new JavaScriptSerializer { MaxJsonLength = 65536 };
                         if (path == "/api/settings")
                         {
                             var settings = serializer.Deserialize<DesktopSettings>(json);

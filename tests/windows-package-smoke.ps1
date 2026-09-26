@@ -12,6 +12,9 @@ function Check-Package([string]$Path) {
             throw "Package is missing $relative in $Path"
         }
     }
+    $version = [System.Reflection.AssemblyName]::GetAssemblyName(
+        (Join-Path $Path 'AiSelectionToolbar.Desktop.exe')).Version.ToString()
+    if ($version -ne '0.2.0.0') { throw "Expected v0.2 executable, found $version" }
 }
 
 if ($ProbeSqlite) {
@@ -43,8 +46,8 @@ if ($ProbeSqlite) {
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $dist = Join-Path $repo 'dist'
-$portableZip = Join-Path $dist 'AISelectionToolbar-0.1.0-win-x64-portable.zip'
-$setup = Join-Path $dist 'AISelectionToolbar-0.1.0-win-x64-setup.exe'
+$portableZip = Join-Path $dist 'AISelectionToolbar-0.2.0-win-x64-portable.zip'
+$setup = Join-Path $dist 'AISelectionToolbar-0.2.0-win-x64-setup.exe'
 foreach ($file in @($portableZip, $setup)) {
     if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing package: $file" }
 }

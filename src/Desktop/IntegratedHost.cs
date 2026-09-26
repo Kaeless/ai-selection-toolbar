@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using AiSelectionToolbar.Core;
 using AiSelectionToolbar.Selection;
 
@@ -102,7 +103,19 @@ namespace AiSelectionToolbar.Desktop
                 case "ask":
                     if (string.IsNullOrWhiteSpace(prompt)) throw new ArgumentException("问题不能为空。", nameof(prompt));
                     instruction = "请用简体中文回答用户针对所选文字提出的问题。"; break;
-                default: throw new ArgumentException("不支持的操作。", nameof(action));
+                default:
+                    if (action == null || !action.StartsWith("custom:", StringComparison.Ordinal))
+                        throw new ArgumentException("不支持的操作。", nameof(action));
+                    Guid actionId;
+                    if (!Guid.TryParseExact(action.Substring("custom:".Length), "N", out actionId))
+                        throw new ArgumentException("自定义操作标识无效。", nameof(action));
+                    var configured = (current.CustomActions ?? new List<CustomActionDefinition>())
+                        .FirstOrDefault(item => item != null &&
+                            string.Equals(item.Id, actionId.ToString("N"), StringComparison.OrdinalIgnoreCase));
+                    if (configured == null || string.IsNullOrWhiteSpace(configured.Prompt))
+                        throw new ArgumentException("自定义操作不存在或已删除。", nameof(action));
+                    instruction = configured.Prompt;
+                    break;
             }
             var text = action == "ask" ? "选中文字：\n" + selection + "\n\n问题：\n" + prompt : selection;
             await chat.StreamAsync(current, apiKey, new[] {
@@ -118,7 +131,10 @@ namespace AiSelectionToolbar.Desktop
                 StartOnLogin = settings.StartOnLogin && StartupRegistration.IsEnabledForCurrentExecutable(),
                 NotesDirectory = MarkdownNoteStore.ResolveDirectory(settings.NotesDirectory),
                 ApiBaseUrl = settings.BaseUrl, Model = settings.Model,
-                ExcludedApplications = new List<string>(settings.ExcludedApplications ?? new List<string>())
+                ExcludedApplications = new List<string>(settings.ExcludedApplications ?? new List<string>()),
+                CustomActions = CopyActions(settings.CustomActions),
+                ToolbarStyle = settings.ToolbarStyle ?? "standard",
+                ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5"
             };
         }
 
@@ -127,12 +143,21 @@ namespace AiSelectionToolbar.Desktop
             lock (gate)
             {
                 var notesDirectory = MarkdownNoteStore.ResolveDirectory(value.NotesDirectory);
+                var customActions = NormalizeActions(value.CustomActions);
+                if (value.ToolbarStyle != "standard" && value.ToolbarStyle != "compact")
+                    throw new ArgumentException("工具栏样式无效。", nameof(value));
+                if (value.ToolbarAccentColor == null ||
+                    !Regex.IsMatch(value.ToolbarAccentColor, @"^#[0-9a-fA-F]{6}$"))
+                    throw new ArgumentException("工具栏颜色应为 #RRGGBB。", nameof(value));
                 var updated = Clone(settings);
                 updated.AutoShow = value.AutoShow;
                 updated.StartOnLogin = value.StartOnLogin;
                 updated.NotesDirectory = notesDirectory;
                 updated.TranslationTargetLanguage = value.TargetLanguage;
                 updated.ExcludedApplications = new List<string>(value.ExcludedApplications ?? new List<string>());
+                updated.CustomActions = customActions;
+                updated.ToolbarStyle = value.ToolbarStyle;
+                updated.ToolbarAccentColor = value.ToolbarAccentColor.ToUpperInvariant();
                 StartupRegistration.SetEnabled(updated.StartOnLogin);
                 try { settingsStore.Save(updated); }
                 catch
@@ -206,8 +231,45 @@ namespace AiSelectionToolbar.Desktop
             TranslationTargetLanguage = source.TranslationTargetLanguage,
             ExcludedApplications = new List<string>(source.ExcludedApplications ?? new List<string>()),
             AutoShow = source.AutoShow, StartOnLogin = source.StartOnLogin,
-            NotesDirectory = source.NotesDirectory
+            NotesDirectory = source.NotesDirectory,
+            CustomActions = CopyActions(source.CustomActions),
+            ToolbarStyle = source.ToolbarStyle, ToolbarAccentColor = source.ToolbarAccentColor
         };
+
+        private static List<CustomActionDefinition> CopyActions(IEnumerable<CustomActionDefinition> actions) =>
+            (actions ?? Enumerable.Empty<CustomActionDefinition>())
+                .Where(action => action != null)
+                .Select(action => new CustomActionDefinition {
+                    Id = action.Id, Name = action.Name, Prompt = action.Prompt
+                }).ToList();
+
+        private static List<CustomActionDefinition> NormalizeActions(IList<CustomActionDefinition> actions)
+        {
+            if (actions == null) return new List<CustomActionDefinition>();
+            if (actions.Count > 8) throw new ArgumentException("最多配置 8 个自定义操作。", nameof(actions));
+            var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var result = new List<CustomActionDefinition>();
+            foreach (var action in actions)
+            {
+                if (action == null || string.IsNullOrWhiteSpace(action.Name) ||
+                    string.IsNullOrWhiteSpace(action.Prompt))
+                    throw new ArgumentException("自定义操作名称和提示词不能为空。", nameof(actions));
+                var name = action.Name.Trim();
+                var prompt = action.Prompt.Trim();
+                if (name.Length > 20 || name.Any(char.IsControl) || prompt.Length > 4000 ||
+                    prompt.Any(c => char.IsControl(c) && c != '\r' && c != '\n' && c != '\t'))
+                    throw new ArgumentException("自定义操作名称或提示词包含无效字符或长度超限。", nameof(actions));
+                Guid parsed = Guid.Empty;
+                if (!string.IsNullOrWhiteSpace(action.Id) && !Guid.TryParseExact(action.Id, "N", out parsed))
+                    throw new ArgumentException("自定义操作标识无效。", nameof(actions));
+                var id = string.IsNullOrWhiteSpace(action.Id) ? Guid.NewGuid().ToString("N") : parsed.ToString("N");
+                if (!ids.Add(id) || !names.Add(name))
+                    throw new ArgumentException("自定义操作标识或名称重复。", nameof(actions));
+                result.Add(new CustomActionDefinition { Id = id, Name = name, Prompt = prompt });
+            }
+            return result;
+        }
 
         public void Dispose()
         {

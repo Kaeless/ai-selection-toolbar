@@ -16,6 +16,14 @@ namespace AiSelectionToolbar.Selection
     /// </summary>
     public sealed class SelectionReader
     {
+        private const uint SmtoAbortIfHung = 0x0002;
+        private const uint WmGetText = 0x000D;
+        private const uint WmGetTextLength = 0x000E;
+        private const uint EmGetSel = 0x00B0;
+        private const int EsPassword = 0x0020;
+        private const int GwlStyle = -16;
+        private const uint MessageTimeoutMs = 250;
+        private const int MaxEditLength = 32767;
         private readonly HashSet<string> excludedProcessNames;
 
         public SelectionReader(IEnumerable<string> excludedProcessNames = null)
@@ -38,7 +46,8 @@ namespace AiSelectionToolbar.Selection
                 return null;
 
             uint processId;
-            if (GetWindowThreadProcessId(window, out processId) == 0 || processId == 0 ||
+            uint foregroundThreadId = GetWindowThreadProcessId(window, out processId);
+            if (foregroundThreadId == 0 || processId == 0 ||
                 processId == GetCurrentProcessId())
                 return null;
 
@@ -62,51 +71,44 @@ namespace AiSelectionToolbar.Selection
             try
             {
                 AutomationElement element = AutomationElement.FocusedElement;
-                if (element == null || !BelongsToWindow(element, window, (int)processId))
-                    return null;
-
-                int focusedProcessId = element.Current.ProcessId;
-                if (focusedProcessId != (int)processId && focusedProcessId > 0)
+                if (element != null && BelongsToWindow(element, window, (int)processId))
                 {
-                    // A text provider can live in a different process from its host window.
-                    // Check that process's exclusion too, before asking it for selected text.
-                    using (Process focusedProcess = Process.GetProcessById(focusedProcessId))
+                    int focusedProcessId = element.Current.ProcessId;
+                    if (!IsAllowedProcess(focusedProcessId, (int)processId))
+                        return null;
+                    if (element.Current.IsPassword)
+                        return null;
+
+                    TextPattern pattern = FindTextPattern(element, window, (int)processId);
+                    if (pattern != null)
                     {
-                        if (excludedProcessNames.Contains(NormalizeProcessName(focusedProcess.ProcessName)))
-                            return null;
+                        TextPatternRange[] ranges = pattern.GetSelection();
+                        if (ranges != null && ranges.Length > 0)
+                        {
+                            StringBuilder selected = new StringBuilder();
+                            Rectangle bounds = Rectangle.Empty;
+                            foreach (TextPatternRange range in ranges)
+                            {
+                                string part = range.GetText(-1);
+                                if (String.IsNullOrEmpty(part))
+                                    continue;
+
+                                if (selected.Length > 0)
+                                    selected.Append(Environment.NewLine);
+                                selected.Append(part);
+                                bounds = UnionBounds(bounds, range.GetBoundingRectangles());
+                            }
+
+                            if (!String.IsNullOrWhiteSpace(selected.ToString()))
+                            {
+                                if (GetForegroundWindow() != window)
+                                    return null;
+                                return new SelectionSnapshot(selected.ToString(), application,
+                                    GetWindowTitle(window), bounds);
+                            }
+                        }
                     }
                 }
-
-                TextPattern pattern = FindTextPattern(element, window);
-                if (pattern == null)
-                    return null;
-
-                TextPatternRange[] ranges = pattern.GetSelection();
-                if (ranges == null || ranges.Length == 0)
-                    return null;
-
-                StringBuilder selected = new StringBuilder();
-                Rectangle bounds = Rectangle.Empty;
-                foreach (TextPatternRange range in ranges)
-                {
-                    string part = range.GetText(-1);
-                    if (String.IsNullOrEmpty(part))
-                        continue;
-
-                    if (selected.Length > 0)
-                        selected.Append(Environment.NewLine);
-                    selected.Append(part);
-                    bounds = UnionBounds(bounds, range.GetBoundingRectangles());
-                }
-
-                if (String.IsNullOrWhiteSpace(selected.ToString()))
-                    return null;
-
-                // The user may have changed windows during the cross-process UIA calls.
-                if (GetForegroundWindow() != window)
-                    return null;
-
-                return new SelectionSnapshot(selected.ToString(), application, GetWindowTitle(window), bounds);
             }
             catch (Exception exception) when (exception is ElementNotAvailableException ||
                                               exception is InvalidOperationException ||
@@ -115,8 +117,100 @@ namespace AiSelectionToolbar.Selection
                                               exception is ArgumentException ||
                                               exception is System.ComponentModel.Win32Exception)
             {
-                return null;
+                // Some standard Edit controls expose no usable UIA TextPattern.
             }
+
+            return TryReadStandardEdit(window, foregroundThreadId, processId, application);
+        }
+
+        private SelectionSnapshot TryReadStandardEdit(IntPtr window, uint threadId,
+            uint processId, string application)
+        {
+            GUITHREADINFO info = new GUITHREADINFO();
+            info.cbSize = (uint)Marshal.SizeOf(typeof(GUITHREADINFO));
+            if (!GetGUIThreadInfo(threadId, ref info) || info.hwndFocus == IntPtr.Zero ||
+                GetAncestor(info.hwndFocus, 2) != window)
+                return null;
+
+            uint focusedProcessId;
+            if (GetWindowThreadProcessId(info.hwndFocus, out focusedProcessId) == 0 ||
+                focusedProcessId == 0 || focusedProcessId == GetCurrentProcessId())
+                return null;
+
+            if (!IsAllowedProcess((int)focusedProcessId, (int)processId))
+                return null;
+
+            StringBuilder className = new StringBuilder(32);
+            if (GetClassName(info.hwndFocus, className, className.Capacity) == 0 ||
+                !String.Equals(className.ToString(), "Edit", StringComparison.OrdinalIgnoreCase) ||
+                !IsWindowUnicode(info.hwndFocus) ||
+                (GetWindowLongPtr(info.hwndFocus, GwlStyle).ToInt64() & EsPassword) != 0)
+                return null;
+
+            IntPtr result;
+            if (SendMessageTimeout(info.hwndFocus, WmGetTextLength, IntPtr.Zero, IntPtr.Zero,
+                SmtoAbortIfHung, MessageTimeoutMs, out result) == IntPtr.Zero)
+                return null;
+            long length = result.ToInt64();
+            if (length <= 0 || length > MaxEditLength)
+                return null;
+
+            if (SendMessageTimeout(info.hwndFocus, EmGetSel, IntPtr.Zero, IntPtr.Zero,
+                SmtoAbortIfHung, MessageTimeoutMs, out result) == IntPtr.Zero)
+                return null;
+            uint selection = unchecked((uint)result.ToInt64());
+            if (selection == UInt32.MaxValue)
+                return null;
+            int start = (int)(selection & 0xFFFF);
+            int end = (int)(selection >> 16);
+            if (end <= start || end > length)
+                return null;
+
+            StringBuilder value = new StringBuilder((int)length + 1);
+            if (SendMessageTimeout(info.hwndFocus, WmGetText, (IntPtr)value.Capacity, value,
+                SmtoAbortIfHung, MessageTimeoutMs, out result) == IntPtr.Zero ||
+                result.ToInt64() < end)
+                return null;
+
+            string text = value.ToString();
+            if (text.Length < end || String.IsNullOrWhiteSpace(text.Substring(start, end - start)))
+                return null;
+
+            // Unlike TextPattern this only knows the control bounds, not glyph positions.
+            RECT rect;
+            if (!GetWindowRect(info.hwndFocus, out rect) || rect.right <= rect.left ||
+                rect.bottom <= rect.top || GetForegroundWindow() != window)
+                return null;
+            GUITHREADINFO current = new GUITHREADINFO();
+            current.cbSize = info.cbSize;
+            if (!GetGUIThreadInfo(threadId, ref current) || current.hwndFocus != info.hwndFocus)
+                return null;
+            Rectangle bounds = Rectangle.FromLTRB(rect.left, rect.top, rect.right, rect.bottom);
+            return new SelectionSnapshot(text.Substring(start, end - start), application,
+                GetWindowTitle(window), bounds);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GUITHREADINFO
+        {
+            public uint cbSize;
+            public uint flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public RECT rcCaret;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int left;
+            public int top;
+            public int right;
+            public int bottom;
         }
 
         private static bool BelongsToWindow(AutomationElement element, IntPtr window, int processId)
@@ -135,12 +229,33 @@ namespace AiSelectionToolbar.Selection
             return focusedProcessId == processId;
         }
 
-        private static TextPattern FindTextPattern(AutomationElement element, IntPtr window)
+        private bool IsAllowedProcess(int candidateId, int foregroundId)
+        {
+            if (candidateId <= 0 || candidateId == (int)GetCurrentProcessId())
+                return false;
+            if (candidateId == foregroundId)
+                return true; // The foreground process was checked before any content access.
+            try
+            {
+                using (Process process = Process.GetProcessById(candidateId))
+                    return !excludedProcessNames.Contains(NormalizeProcessName(process.ProcessName));
+            }
+            catch (Exception exception) when (exception is ArgumentException ||
+                                              exception is InvalidOperationException ||
+                                              exception is System.ComponentModel.Win32Exception)
+            {
+                return false;
+            }
+        }
+
+        private TextPattern FindTextPattern(AutomationElement element, IntPtr window, int foregroundId)
         {
             for (int depth = 0; element != null && depth < 32; depth++)
             {
                 int handle = element.Current.NativeWindowHandle;
                 if (handle != 0 && GetAncestor(new IntPtr(handle), 2) != window)
+                    break;
+                if (!IsAllowedProcess(element.Current.ProcessId, foregroundId) || element.Current.IsPassword)
                     break;
                 object pattern;
                 if (element.TryGetCurrentPattern(TextPattern.Pattern, out pattern))
@@ -207,6 +322,32 @@ namespace AiSelectionToolbar.Selection
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetAncestor(IntPtr window, uint flags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetGUIThreadInfo(uint threadId, ref GUITHREADINFO info);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetClassName(IntPtr window, StringBuilder className, int maxCount);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowUnicode(IntPtr window);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetWindowLongPtrW")]
+        private static extern IntPtr GetWindowLongPtr(IntPtr window, int index);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr window, out RECT rect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
+        private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam,
+            IntPtr lParam, uint flags, uint timeout, out IntPtr result);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
+        private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam,
+            [Out] StringBuilder lParam, uint flags, uint timeout, out IntPtr result);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetWindowTextLength(IntPtr window);

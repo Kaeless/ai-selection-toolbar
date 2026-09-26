@@ -17,6 +17,9 @@ namespace AiSelectionToolbar.Core
         [DataMember(Order = 7)] public bool AutoShow { get; set; } = true;
         [DataMember(Order = 8)] public string NotesDirectory { get; set; }
         [DataMember(Order = 9)] public bool StartOnLogin { get; set; }
+        [DataMember(Order = 10)] public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
+        [DataMember(Order = 11)] public string ToolbarStyle { get; set; } = "standard";
+        [DataMember(Order = 12)] public string ToolbarAccentColor { get; set; } = "#4F46E5";
         // Local OpenAI-compatible endpoints may intentionally have no API key.
         public bool IsConfigured => !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(Model);
 
@@ -27,7 +30,18 @@ namespace AiSelectionToolbar.Core
             TranslationTargetLanguage = "中文";
             ExcludedApplications = new List<string>();
             AutoShow = true;
+            CustomActions = new List<CustomActionDefinition>();
+            ToolbarStyle = "standard";
+            ToolbarAccentColor = "#4F46E5";
         }
+    }
+
+    [DataContract]
+    public sealed class CustomActionDefinition
+    {
+        [DataMember(Order = 1)] public string Id { get; set; }
+        [DataMember(Order = 2)] public string Name { get; set; }
+        [DataMember(Order = 3)] public string Prompt { get; set; }
     }
 
     public sealed class ChatMessage
