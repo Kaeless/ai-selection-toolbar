@@ -17,8 +17,11 @@ internal static class Program
             Application.Init();
             using var host = new LinuxHost();
             using var selection = new LinuxSelectionService(host.LoadSettings().ExcludedApplications);
-            using var window = new LinuxWindow(host, selection);
-            if (!host.LoadSettings().IsConfigured || args.Contains("--settings", StringComparer.Ordinal))
+            using var management = new LinuxManagementServer(host);
+            management.Start();
+            using var window = new LinuxWindow(host, selection, management);
+            if (!args.Contains("--no-management", StringComparer.Ordinal) &&
+                (!host.LoadSettings().IsConfigured || args.Contains("--settings", StringComparer.Ordinal)))
                 window.ShowManagement();
             selection.Start();
             Application.Run();

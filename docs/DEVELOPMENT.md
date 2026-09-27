@@ -1,14 +1,19 @@
 # AI 划词工具栏：开发原型
 
-本目录是接续原项目需求方案的代码原型。以远程仓库 `Kaeless/ai-selection-toolbar` 的 `main` 为基线，通过独立分支和 Pull Request 集成代码；不要将本地初始化的 Git 历史强制推送到远端。
+本仓库在 `main` 上维护可运行实现与项目文档。提交应基于现有 Git 历史，避免重建仓库历史或强制推送覆盖远端。
 
 ## 模块
 
-- `src/Selection/`：全局鼠标拖选和 Ctrl+Shift+Space 快捷键触发；先检查前台与焦点进程的排除名单，再通过 Windows UI Automation `TextPattern` 获取选区。标准 Unicode Win32 `Edit` 控件可走 `EM_GETSEL`/`WM_GETTEXT` 有界消息回退；不读取密码控件，不通过模拟复制改变剪贴板。
-- `src/Core/`：OpenAI 兼容的流式请求和取消、DPAPI 加密的 API 密钥、SQLite 历史、Markdown 笔记。
-- `src/Desktop/`：.NET Framework 4.8 WPF 浮窗，以及只监听 `127.0.0.1` 的本机设置与历史管理页。管理页通过随机会话令牌访问本机 API。
+- `src/Platforms/Windows/Selection/`：全局鼠标拖选和 Ctrl+Shift+Space 快捷键触发；先检查前台与焦点进程的排除名单，再通过 Windows UI Automation `TextPattern` 获取选区。标准 Unicode Win32 `Edit` 控件可走 `EM_GETSEL`/`WM_GETTEXT` 有界消息回退；不读取密码控件，不通过模拟复制改变剪贴板。
+- `src/Shared/Core/`：OpenAI 兼容的流式请求和取消、通用模型、SQLite 历史与 Markdown 笔记。
+- `src/Platforms/Windows/` 中的 `SettingsStore` 使用 DPAPI；Linux 密钥存储位于 Linux 平台目录并使用当前用户权限保护。
+- `src/Features/ManagementUI/`：Windows 与 Linux 共用的浏览器管理页静态资源。
+- `src/Platforms/Windows/`：.NET Framework 4.8 WPF 浮窗、Windows 选区捕获和本机管理 API。
+- `src/Platforms/Linux/`：.NET 8 + GTK/X11 桌面后台，以及提供相同页面和 API 的 loopback 管理服务。
 
-已配置模型时程序收进系统托盘，划词后显示浮窗；首次未配置时显示窗口以便打开管理页。快捷键被其他程序占用时仍保留鼠标取词，并给出提示。远程 API 地址必须使用 HTTPS；HTTP 只允许回环地址上的本地 API。
+两端管理服务只监听 `127.0.0.1`，每次启动生成随机会话令牌；密钥由各自平台后台保存，不会在管理页回显。公共 API 约定见[管理 API](./MANAGEMENT-API.md)。
+
+已配置模型时程序收进系统托盘，划词后显示浮窗；首次未配置时打开浏览器管理页。快捷键被其他程序占用时仍保留鼠标取词，并给出提示。远程 API 地址必须使用 HTTPS；HTTP 只允许回环地址上的本地 API。
 
 用户点击解释、翻译或提问后，选中文字才会发往所配置的地址。未配置地址和模型时不发送。笔记需先完成解释并由用户编辑确认，同一来源每天追加到 `YYYY-MM-DD_来源_学习.md`。
 
@@ -17,14 +22,14 @@
 在安装了 .NET Framework 4.8 Developer Pack 和 Visual Studio 2019/2022 的 Windows x64 开发机上：
 
 ```powershell
-msbuild src\Desktop\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=AnyCPU
+msbuild src\Platforms\Windows\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=AnyCPU
 ```
 
 工程目标进程为 x64。NuGet 包 `System.Data.SQLite.Core` 固定为 `1.0.119`；发布时确认输出目录含 `x64/SQLite.Interop.dll` 和托管提供程序，再将 Release 输出目录打包。API 密钥由当前 Windows 用户的 DPAPI 保护；复制设置文件到其他用户账户无法解密。
 
 ## 打包与安装
 
-CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含安装程序和便携压缩包。Windows 本机也可运行 `ISCC.exe installer\AiSelectionToolbar.iss`，将安装程序生成到 `dist`。便携版解压后运行 `AiSelectionToolbar.Desktop.exe`。
+CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含安装程序和便携压缩包。Windows 本机也可运行 `ISCC.exe src\Packaging\Windows\AiSelectionToolbar.iss`，将安装程序生成到 `dist`。便携版解压后运行 `AiSelectionToolbar.Desktop.exe`。
 
 两种版本都要求目标计算机已安装 .NET Framework 4.8 或更高版本；安装程序会在安装前检查，便携版需用户自行确认。安装程序按当前用户安装到 `%LOCALAPPDATA%\Programs\AiSelectionToolbar`。登录启动可以在设置中开启，默认关闭；移动便携版后重新运行，会更新已启用的启动项路径。笔记默认在用户“文档”中的 `AiSelectionToolbar\Notes`，设置中可指定绝对目录。
 

@@ -50,16 +50,20 @@ internal sealed class LinuxHistoryStore : IDisposable
         }
     }
 
-    public IList<HistoryEntry> Search(string term)
+    public IList<HistoryEntry> Search(string term, int offset = 0, int limit = 50)
     {
         lock (gate)
         {
             using var command = db.CreateCommand();
             command.CommandText = "SELECT id,created_utc_ticks,selected_text,action,prompt,source,source_application,source_file,source_title,response " +
                 "FROM history WHERE $term = '' OR instr(lower(selected_text),lower($term)) > 0 OR " +
-                "instr(lower(coalesce(response,'')),lower($term)) > 0 OR instr(lower(coalesce(source,'')),lower($term)) > 0 " +
-                "ORDER BY id DESC LIMIT 100";
+                "instr(lower(coalesce(response,'')),lower($term)) > 0 OR instr(lower(coalesce(prompt,'')),lower($term)) > 0 OR " +
+                "instr(lower(coalesce(source,'')),lower($term)) > 0 OR instr(lower(coalesce(source_application,'')),lower($term)) > 0 OR " +
+                "instr(lower(coalesce(source_title,'')),lower($term)) > 0 " +
+                "ORDER BY id DESC LIMIT $limit OFFSET $offset";
             command.Parameters.AddWithValue("$term", term ?? "");
+            command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+            command.Parameters.AddWithValue("$offset", Math.Max(0, offset));
             using var reader = command.ExecuteReader();
             var items = new List<HistoryEntry>();
             string Value(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
@@ -70,6 +74,27 @@ internal sealed class LinuxHistoryStore : IDisposable
                 SourceTitle = Value(8), Response = Value(9)
             });
             return items;
+        }
+    }
+
+    public void Delete(long id)
+    {
+        lock (gate)
+        {
+            using var command = db.CreateCommand();
+            command.CommandText = "DELETE FROM history WHERE id = $id";
+            command.Parameters.AddWithValue("$id", id);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    public void Clear()
+    {
+        lock (gate)
+        {
+            using var command = db.CreateCommand();
+            command.CommandText = "DELETE FROM history";
+            command.ExecuteNonQuery();
         }
     }
 

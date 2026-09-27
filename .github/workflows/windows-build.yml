@@ -1,6 +1,8 @@
 name: Windows build
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -16,11 +18,11 @@ jobs:
         with:
           msbuild-architecture: x64
       - name: Restore and build WPF application
-        run: msbuild src\Desktop\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
+        run: msbuild src\Platforms\Windows\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
       - name: Package portable build
         shell: pwsh
         run: |
-          $release = Resolve-Path 'src/Desktop/bin/Release'
+          $release = Resolve-Path 'src/Platforms/Windows/bin/Release'
           $package = Join-Path $env:USERPROFILE '.nuget/packages/stub.system.data.sqlite.core.netframework/1.0.119'
           if (!(Test-Path $package)) { throw 'SQLite NuGet package missing after restore' }
           $native = @(Get-ChildItem $package -Filter SQLite.Interop.dll -Recurse -File |
@@ -39,16 +41,16 @@ jobs:
           $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
           $compiler = if ($command) { $command.Source } else { 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' }
           if (!(Test-Path $compiler)) { throw 'Inno Setup compiler missing from Windows runner' }
-          & $compiler 'installer/AiSelectionToolbar.iss'
+          & $compiler 'src/Packaging/Windows/AiSelectionToolbar.iss'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Smoke test portable and installer packages
         shell: pwsh
-        run: ./tests/windows-package-smoke.ps1
+        run: ./test/windows-package-smoke.ps1
       - name: Smoke test reasoning and answer stream
         shell: pwsh
         run: |
-          $release = (Resolve-Path 'src/Desktop/bin/Release').Path
-          $source = (Resolve-Path 'tests/ChatStreamSmoke.cs').Path
+          $release = (Resolve-Path 'src/Platforms/Windows/bin/Release').Path
+          $source = (Resolve-Path 'test/ChatStreamSmoke.cs').Path
           $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
           & $compiler /nologo /target:exe /out:"$release/ChatStreamSmoke.exe" `
             /reference:"$release/AiSelectionToolbar.Desktop.exe" /reference:System.Net.Http.dll `

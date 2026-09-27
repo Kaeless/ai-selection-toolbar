@@ -44,23 +44,23 @@
     <Compile Include="LocalManagementServer.cs" />
     <Compile Include="IntegratedHost.cs" />
     <Compile Include="StartupRegistration.cs" />
-    <Compile Include="..\Selection\SelectionSnapshot.cs"><Link>Selection\SelectionSnapshot.cs</Link></Compile>
-    <Compile Include="..\Selection\SelectionReader.cs"><Link>Selection\SelectionReader.cs</Link></Compile>
-    <Compile Include="..\Selection\SelectionTrigger.cs"><Link>Selection\SelectionTrigger.cs</Link></Compile>
-    <Compile Include="..\Core\Models.cs"><Link>Core\Models.cs</Link></Compile>
-    <Compile Include="..\Core\SettingsStore.cs"><Link>Core\SettingsStore.cs</Link></Compile>
-    <Compile Include="..\Core\ChatCompletionClient.cs"><Link>Core\ChatCompletionClient.cs</Link></Compile>
-    <Compile Include="..\Core\HistoryStore.cs"><Link>Core\HistoryStore.cs</Link></Compile>
-    <Compile Include="..\Core\MarkdownNoteStore.cs"><Link>Core\MarkdownNoteStore.cs</Link></Compile>
+    <Compile Include="Selection\SelectionSnapshot.cs" />
+    <Compile Include="Selection\SelectionReader.cs" />
+    <Compile Include="Selection\SelectionTrigger.cs" />
+    <Compile Include="..\..\Shared\Core\Models.cs"><Link>Core\Models.cs</Link></Compile>
+    <Compile Include="..\..\Shared\Core\SettingsStore.cs"><Link>Core\SettingsStore.cs</Link></Compile>
+    <Compile Include="..\..\Shared\Core\ChatCompletionClient.cs"><Link>Core\ChatCompletionClient.cs</Link></Compile>
+    <Compile Include="..\..\Shared\Core\HistoryStore.cs"><Link>Core\HistoryStore.cs</Link></Compile>
+    <Compile Include="..\..\Shared\Core\MarkdownNoteStore.cs"><Link>Core\MarkdownNoteStore.cs</Link></Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="ManagementPage.html" />
-    <EmbeddedResource Include="ManagementPage.js" />
-    <EmbeddedResource Include="ManagementPage.css" />
+    <EmbeddedResource Include="..\..\Features\ManagementUI\ManagementPage.html"><LogicalName>AiSelectionToolbar.Desktop.ManagementPage.html</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\Features\ManagementUI\ManagementPage.js"><LogicalName>AiSelectionToolbar.Desktop.ManagementPage.js</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\Features\ManagementUI\ManagementPage.css"><LogicalName>AiSelectionToolbar.Desktop.ManagementPage.css</LogicalName></EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -48,8 +48,42 @@ public sealed class LinuxHost : IDisposable
         }
     }
 
-    public IList<HistoryEntry> SearchHistory(string term) => history.Search(term);
+    public void IncludeApplication(string application)
+    {
+        if (string.IsNullOrWhiteSpace(application)) return;
+        lock (gate)
+        {
+            var current = settings.Load();
+            current.ExcludedApplications ??= new List<string>();
+            current.ExcludedApplications.RemoveAll(name => string.Equals(name, application, StringComparison.OrdinalIgnoreCase));
+            settings.Save(current, null, false);
+        }
+    }
+
+    public IList<HistoryEntry> SearchHistory(string term, int offset = 0) => history.Search(term, offset);
     public void SaveHistory(HistoryEntry entry) => history.Add(entry);
+    public void DeleteHistory(long id) => history.Delete(id);
+    public void ClearHistory() => history.Clear();
+
+    public void SetStartup(bool enabled)
+    {
+        var config = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        if (string.IsNullOrWhiteSpace(config)) config = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+        var directory = Path.Combine(config, "autostart");
+        var desktopFile = Path.Combine(directory, "ai-selection-toolbar.desktop");
+        if (!enabled)
+        {
+            if (File.Exists(desktopFile)) File.Delete(desktopFile);
+            return;
+        }
+        Directory.CreateDirectory(directory);
+        var executable = Environment.ProcessPath ?? throw new InvalidOperationException("无法确定程序路径");
+        var quotedExecutable = "\"" + executable.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        File.WriteAllText(desktopFile, "[Desktop Entry]\nType=Application\nName=AI 划词工具栏\n" +
+            "Exec=" + quotedExecutable + "\nTerminal=false\nX-GNOME-Autostart-enabled=true\n");
+        File.SetUnixFileMode(desktopFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
 
     public string SaveNote(string text, string editedAnswer, string application, string title)
     {

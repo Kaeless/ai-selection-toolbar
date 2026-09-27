@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AiSelectionToolbar.Linux</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="GtkSharp" Version="3.24.24.95" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Shared/Core/Models.cs" Link="Core/Models.cs" />
+    <Compile Include="../../Shared/Core/ChatCompletionClient.cs" Link="Core/ChatCompletionClient.cs" />
+    <Compile Include="../../Shared/Core/MarkdownNoteStore.cs" Link="Core/MarkdownNoteStore.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../Features/ManagementUI/ManagementPage.html" LogicalName="AiSelectionToolbar.Linux.ManagementPage.html" />
+    <EmbeddedResource Include="../../Features/ManagementUI/ManagementPage.js" LogicalName="AiSelectionToolbar.Linux.ManagementPage.js" />
+    <EmbeddedResource Include="../../Features/ManagementUI/ManagementPage.css" LogicalName="AiSelectionToolbar.Linux.ManagementPage.css" />
+  </ItemGroup>
+</Project>

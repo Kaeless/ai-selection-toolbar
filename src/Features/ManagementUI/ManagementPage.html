@@ -27,9 +27,9 @@
           <div class="section-head"><h2>使用偏好</h2><p>调整浮窗、翻译语言与本机笔记位置。</p></div>
           <div class="card">
             <label class="switch-row" for="autoShow"><span><strong>选中文字后显示工具栏</strong><small>在支持取词的程序中自动显示</small></span><input id="autoShow" type="checkbox"></label>
-            <label class="switch-row" for="startOnLogin"><span><strong>登录 Windows 后自动启动</strong><small>仅当前用户；移动便携版后请手动运行一次以更新路径</small></span><input id="startOnLogin" type="checkbox"></label>
+            <label class="switch-row" for="startOnLogin"><span><strong>登录桌面后自动启动</strong><small>仅当前用户生效</small></span><input id="startOnLogin" type="checkbox"></label>
             <div class="field"><label for="language">翻译目标语言</label><input id="language" maxlength="50" placeholder="中文"></div>
-            <div class="field"><label for="notesDirectory">笔记保存目录</label><input id="notesDirectory" maxlength="2048" placeholder="C:\Users\...\Documents\AiSelectionToolbar\Notes"><small>输入绝对路径；新笔记会立即保存到这个目录。</small></div>
+            <div class="field"><label for="notesDirectory">笔记保存目录</label><input id="notesDirectory" maxlength="2048" placeholder="输入本机绝对路径"><small>输入当前系统的绝对路径；新笔记会立即保存到这个目录。</small></div>
             <div class="actions"><button id="saveSettings" class="primary" type="button">保存设置</button></div>
           </div>
           <div class="section-head second"><h2>模型连接</h2><p>使用兼容 Chat Completions 的服务。密钥只保存在本机，不在页面回显。</p></div>
@@ -70,7 +70,7 @@
         <section id="exclusionsPanel" class="panel" hidden>
           <div class="section-head"><h2>排除程序</h2><p>不在这些程序中读取选中文字。浮窗里也可一键隐藏当前程序。</p></div>
           <div class="card">
-            <div class="file-picker"><span><strong>选择 Windows 程序</strong><small>只读取 .exe 文件名，不上传文件内容。</small></span><button id="chooseExe" class="secondary" type="button">选择 EXE</button><input id="exeFile" type="file" accept=".exe,application/x-msdownload" hidden></div>
+            <div class="field"><label for="applicationName">程序名称</label><div class="history-controls"><input id="applicationName" maxlength="200" placeholder="例如 chrome.exe 或 firefox"><button id="addApplication" class="secondary" type="button">添加排除</button></div><small>填写程序名；工具栏也可直接排除当前程序。</small></div>
             <ul id="excludedList"></ul>
           </div>
         </section>

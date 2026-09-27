@@ -10,7 +10,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=6.1sp1
-OutputDir=..\dist
+OutputDir=..\..\..\dist
 OutputBaseFilename=AISelectionToolbar-{#AppVersion}-win-x64-setup
 Compression=lzma
 SolidCompression=yes
@@ -20,7 +20,7 @@ UninstallDisplayIcon={app}\AiSelectionToolbar.Desktop.exe
 Name: desktopicon; Description: "创建桌面快捷方式"
 
 [Files]
-Source: "..\src\Desktop\bin\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "..\..\Platforms\Windows\bin\Release\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{group}\AI 划词工具栏"; Filename: "{app}\AiSelectionToolbar.Desktop.exe"

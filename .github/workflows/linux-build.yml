@@ -1,6 +1,8 @@
 name: Linux build
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -18,9 +20,9 @@ jobs:
       - name: Install GTK and X11 test dependencies
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-0 xclip xvfb xauth
       - name: Restore and build
-        run: dotnet build src/Linux/AiSelectionToolbar.Linux.csproj -c Release --nologo
+        run: dotnet build src/Platforms/Linux/AiSelectionToolbar.Linux.csproj -c Release --nologo
       - name: Publish portable Linux binary
-        run: dotnet publish src/Linux/AiSelectionToolbar.Linux.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/linux-x64
+        run: dotnet publish src/Platforms/Linux/AiSelectionToolbar.Linux.csproj -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/linux-x64
       - name: Check startup guard without X11
         run: |
           set +e
@@ -31,14 +33,14 @@ jobs:
       - name: Smoke test GTK startup under Xvfb
         run: |
           set +e
-          timeout 8s xvfb-run -a env XDG_SESSION_TYPE=x11 dist/linux-x64/AiSelectionToolbar.Linux > /tmp/linux-gtk.out 2>&1
+          timeout 8s xvfb-run -a env XDG_SESSION_TYPE=x11 dist/linux-x64/AiSelectionToolbar.Linux --no-management > /tmp/linux-gtk.out 2>&1
           result=$?
           cat /tmp/linux-gtk.out
           test "$result" -eq 124
       - name: Package artifact
         run: |
-          cp src/Desktop/Assets/AppIcon.svg dist/linux-x64/AppIcon.svg
-          cp packaging/linux/install.sh packaging/linux/uninstall.sh dist/linux-x64/
+          cp src/Platforms/Windows/Assets/AppIcon.svg dist/linux-x64/AppIcon.svg
+          cp src/Packaging/Linux/install.sh src/Packaging/Linux/uninstall.sh dist/linux-x64/
           chmod +x dist/linux-x64/install.sh dist/linux-x64/uninstall.sh
           tar -C dist/linux-x64 -czf dist/AISelectionToolbar-linux-x64.tar.gz .
       - uses: actions/upload-artifact@v4

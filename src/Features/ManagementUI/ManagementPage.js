@@ -190,15 +190,12 @@ byId("saveConnection").addEventListener("click", () => run(async () => {
     Model: byId("model").value.trim(), ApiKey: byId("apiKey").value});
   byId("apiKey").value = ""; status("连接配置已保存");
 }));
-byId("chooseExe").addEventListener("click", () => byId("exeFile").click());
-byId("exeFile").addEventListener("change", event => run(async () => {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    if (!/\.exe$/i.test(file.name)) throw new Error("请选择 .exe 程序文件");
-    await api("/api/exclusions/add", "POST", {application: file.name});
-    await loadExclusions(); status("已排除 " + file.name);
-  } finally { event.target.value = ""; }
+byId("addApplication").addEventListener("click", () => run(async () => {
+  const name = byId("applicationName").value.trim();
+  if (!name) throw new Error("请填写程序名称");
+  await api("/api/exclusions/add", "POST", {application: name});
+  byId("applicationName").value = "";
+  await loadExclusions(); status("已添加排除程序：" + name);
 }));
 byId("historySearch").addEventListener("input", () => { historyOffset = 0; run(loadHistory); });
 byId("historyPrev").addEventListener("click", () => { historyOffset = Math.max(0, historyOffset - 50); run(loadHistory); });
