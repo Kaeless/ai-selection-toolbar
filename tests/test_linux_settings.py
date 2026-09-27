@@ -75,7 +75,7 @@ class SettingsStoreTests(unittest.TestCase):
 
     def test_public_settings_contains_app_metadata(self) -> None:
         public = self.store.public_settings()
-        self.assertEqual("0.5.2", public["Version"])
+        self.assertEqual("0.5.3", public["Version"])
         self.assertEqual("Kaeless", public["Author"])
 
 

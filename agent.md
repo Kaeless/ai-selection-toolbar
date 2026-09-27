@@ -29,7 +29,7 @@ Windows 继续使用现有 C# 实现；Linux 使用 Python/PySide6 和 X11。配
 - Linux 历史记录兼容旧版 C# SQLite 表结构，管理页索引位于左侧且不再显示分页按钮。
 - Linux 发布包包含 `AiSelectionToolbar.Linux`、`install.sh`、`uninstall.sh` 和 `AppIcon.svg`。
 - Linux CI 还会生成无需解压、可直接运行的 `AISelectionToolbar-linux-x64.run` 安装包；Windows CI 生成 Inno Setup 安装 EXE。
-- 管理页面从后端动态显示当前版本和作者；当前 Linux 版本为 `0.5.2`，作者为 `Kaeless`。
+- 管理页面从后端动态显示当前版本和作者；当前 Linux 版本为 `0.5.3`，作者为 `Kaeless`。
 
 ## 重要目录
 
@@ -59,7 +59,7 @@ ai-selection-toolbar
 发布包安装：
 
 ```bash
-tar -xzf AISelectionToolbar-linux-x64-v0.5.2.tar.gz
+tar -xzf AISelectionToolbar-linux-x64-v0.5.3.tar.gz
 cd AISelectionToolbar-linux-x64
 ./install.sh
 ```
@@ -80,12 +80,18 @@ cd /home/cao/code/AI-toolbar
 
 PyInstaller 构建入口参考 `.github/workflows/linux-build.yml`。构建时必须包含管理页面文件和 `src/Desktop/Assets/AppIcon.svg`。
 
+## 最近需求汇总（Linux 已实施，Windows 待下一轮同步）
+
+- 回答窗口：修正宽度与内容不匹配，限制为屏幕约 70% 高度；隐藏滚动条；圆角透明背景去除黑色角落；改为浅色 Apple 风格；右上角关闭/固定；解释和详细解释完成后显示追问栏。
+- 回答内容：详细解释继续使用 Chat Completions SSE 流式解析；若服务端或代理缓冲，客户端无法在收到数据前显示，已增加防缓冲请求头。
+- 历史记录：管理页按 Markdown 渲染回答，支持标题、列表、代码块、粗体等常用语法；保留回答和追问上下文。
+- 工具栏：保留上一次解答入口和应用图标；Linux 回答窗口已移除停止按钮。
+- 发布规则：版本号变化生成新的带版本名 `.run`；同版本修改更新固定 `.run` 并自动安装。后续完成 Linux 验证后，将同一需求集同步到 Windows WPF。
+
 ## 最新发布
 
-- 版本：`v0.5.2`
-- 发布页：`https://github.com/Kaeless/ai-selection-toolbar/releases/tag/v0.5.2`
-- Linux 下载：`https://github.com/Kaeless/ai-selection-toolbar/releases/download/v0.5.2/AISelectionToolbar-linux-x64-v0.5.2.run`
-- SHA256：`35b6de9e7fe8a80f6ae40b374004aaebea6e8e9ebc4d007e8452584845890a94`
+- 版本：`v0.5.3`（本地构建，尚未创建 Release）
+- Linux 下载：构建后生成 `dist/AISelectionToolbar-linux-x64-v0.5.3.run`
 
 ## 后续修改约定
 

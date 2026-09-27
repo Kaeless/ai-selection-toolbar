@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QPoint, QRect, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QLinearGradient, QPainter, QPen, QPixmap, QTextOption
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QGuiApplication, QLinearGradient, QPainter, QPen, QPixmap, QTextOption
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -48,7 +48,7 @@ class Toolbar(QWidget):
 
     def __init__(self) -> None:
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(8, 7, 8, 7)
         self.layout.setSpacing(4)
@@ -133,15 +133,17 @@ class Toolbar(QWidget):
 class AnswerWindow(QWidget):
     close_requested = Signal()
     pinned_changed = Signal(bool)
+    followup_requested = Signal(str)
 
     def __init__(self) -> None:
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self._accent = QColor("#0071E3")
         self._background = QColor("#F8FAFC")
         self._border = QColor("#0B1020")
         self._pending_markdown = ""
         self._pending_complete = False
+        self._followup_allowed = False
         self._render_timer = QTimer(self)
         self._render_timer.setSingleShot(True)
         self._render_timer.timeout.connect(self._render_pending_answer)
@@ -149,8 +151,8 @@ class AnswerWindow(QWidget):
         self._pinned = False
         self._drag_offset = None
         self.setWindowTitle("AI 回答")
-        self.setMinimumWidth(700)
-        self.resize(760, 420)
+        self.setMinimumWidth(560)
+        self.resize(700, 420)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 16, 18, 16)
         self.heading = QLabel("正在生成回答…")
@@ -160,6 +162,11 @@ class AnswerWindow(QWidget):
         header.setContentsMargins(0, 0, 0, 5)
         header.addWidget(self.heading)
         header.addStretch()
+        self.close_button = QPushButton("×")
+        self.close_button.setObjectName("closeButton")
+        self.close_button.setToolTip("关闭回答")
+        self.close_button.setAccessibleName("关闭回答")
+        header.addWidget(self.close_button)
         self.pin_button = QPushButton("📌")
         self.pin_button.setObjectName("pinButton")
         self.pin_button.setCheckable(True)
@@ -173,17 +180,26 @@ class AnswerWindow(QWidget):
         text_option = QTextOption()
         text_option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
         self.viewer.document().setDefaultTextOption(text_option)
-        self.stop_button = QPushButton("停止")
-        self.close_button = QPushButton("关闭")
-        footer = QHBoxLayout()
-        footer.addStretch()
-        footer.addWidget(self.stop_button)
-        footer.addWidget(self.close_button)
+        self.followup_input = QLineEdit()
+        self.followup_input.setObjectName("followupInput")
+        self.followup_input.setPlaceholderText("继续追问这份回答…")
+        self.followup_button = QPushButton("追问")
+        self.followup_button.setObjectName("followupButton")
+        self.followup_button.setToolTip("基于当前回答继续提问")
+        self.followup_row = QWidget()
+        followup_layout = QHBoxLayout(self.followup_row)
+        followup_layout.setContentsMargins(0, 8, 0, 0)
+        followup_layout.setSpacing(8)
+        followup_layout.addWidget(self.followup_input, 1)
+        followup_layout.addWidget(self.followup_button)
         layout.addLayout(header)
         layout.addWidget(self.viewer, 1)
-        layout.addLayout(footer)
+        layout.addWidget(self.followup_row)
         self.pin_button.toggled.connect(self.set_pinned)
         self.close_button.clicked.connect(self.close)
+        self.followup_button.clicked.connect(self._submit_followup)
+        self.followup_input.returnPressed.connect(self._submit_followup)
+        self.followup_row.setVisible(False)
         self._apply_style()
 
     def set_accent(self, value: str) -> None:
@@ -207,8 +223,13 @@ class AnswerWindow(QWidget):
             QLabel#heading {{ color: #172033; font-size: 18px; font-weight: 650; padding: 2px 2px 0; }}
             QPushButton#pinButton {{ min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; padding: 0;
                                     border-radius: 16px; font-size: 16px; }}
+            QPushButton#closeButton {{ min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; padding: 0;
+                                      border-radius: 16px; font-size: 24px; font-weight: 300; }}
             QTextBrowser {{ background: {self._background.name()}; color: #243149; border: 1px solid {self._border.name()};
                            border-radius: 16px; padding: 16px; font-size: 14px; selection-background-color: {_light(self._accent, 180)}; }}
+            QLineEdit#followupInput {{ background: #ffffff; color: #243149; border: 1px solid {self._border.name()};
+                                      border-radius: 999px; padding: 9px 15px; font-size: 14px; }}
+            QPushButton#followupButton {{ padding: 9px 18px; }}
             QPushButton {{ background: #ffffff; color: #35445d; border: 1px solid {self._border.name()};
                           border-radius: 999px; padding: 9px 17px; }}
             QPushButton:hover {{ background: {_light(self._accent, 185)}; color: {accent}; }}
@@ -254,6 +275,13 @@ class AnswerWindow(QWidget):
         self._pending_complete = False
         self.heading.setText("正在生成回答…")
         self.viewer.clear()
+        self.followup_input.clear()
+        self.followup_row.setVisible(False)
+
+    def set_followup_allowed(self, allowed: bool) -> None:
+        self._followup_allowed = allowed
+        if not allowed:
+            self.followup_row.setVisible(False)
 
     def set_answer(self, markdown: str, complete: bool = False) -> None:
         self._pending_markdown = markdown
@@ -265,19 +293,32 @@ class AnswerWindow(QWidget):
             self._render_timer.start(50)
 
     def _render_pending_answer(self) -> None:
+        complete = self._pending_complete
         self.viewer.setMarkdown(self._pending_markdown)
-        self._fit_to_answer()
-        if self._pending_complete:
+        self._fit_to_answer(resize_width=complete)
+        if complete:
             self.heading.setText("回答完成")
             self._pending_complete = False
+            self.followup_row.setVisible(self._followup_allowed)
 
-    def _fit_to_answer(self) -> None:
+    def _fit_to_answer(self, resize_width: bool = False) -> None:
         """Grow with streamed content up to the current screen's usable height."""
         if self._fitting:
             return
         self._fitting = True
         try:
             document = self.viewer.document()
+            screen = QGuiApplication.screenAt(self.pos()) or QGuiApplication.primaryScreen()
+            if resize_width:
+                max_width = max(560, int(screen.availableGeometry().width() * 0.82))
+                metrics = QFontMetrics(self.viewer.font())
+                longest_line = max(
+                    (metrics.horizontalAdvance(line) for line in self.viewer.toPlainText().splitlines()),
+                    default=0,
+                )
+                target_width = max(560, min(max_width, longest_line + 88))
+                if abs(target_width - self.width()) > 1:
+                    self.resize(target_width, self.height())
             viewport_width = self.viewer.viewport().width()
             if viewport_width <= 0:
                 viewport_width = self.width() - 54
@@ -285,8 +326,7 @@ class AnswerWindow(QWidget):
             document.setTextWidth(max(320, viewport_width - 12))
             document.adjustSize()
             content_height = math.ceil(document.size().height())
-            screen = QGuiApplication.screenAt(self.pos()) or QGuiApplication.primaryScreen()
-            max_height = max(220, screen.availableGeometry().height() - 48)
+            max_height = max(360, int(screen.availableGeometry().height() * 0.70))
             # Keep short Markdown blocks, especially fenced code, inside the
             # viewport even though the scrollbar itself is intentionally hidden.
             target_height = max(240, min(max_height, content_height + 82))
@@ -301,13 +341,22 @@ class AnswerWindow(QWidget):
             self.viewer.document().setTextWidth(max(320, self.viewer.viewport().width() - 12))
 
     def set_error(self, message: str) -> None:
+        self.followup_row.setVisible(False)
         self.heading.setText("请求失败")
         self.viewer.setHtml("<p style='color:#a33'>" + html.escape(message) + "</p>")
+
+    def _submit_followup(self) -> None:
+        question = self.followup_input.text().strip()
+        if not question:
+            return
+        self.followup_input.clear()
+        self.followup_requested.emit(question)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton:
             child = self.childAt(event.position().toPoint())
-            if child not in {self.viewer, self.pin_button, self.stop_button, self.close_button}:
+            if child not in {self.viewer, self.pin_button, self.close_button,
+                             self.followup_input, self.followup_button}:
                 self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
                 event.accept()
                 return

@@ -33,9 +33,13 @@ class ApplicationController:
         self.selection_title = ""
         self.answer_text = ""
         self.last_answer_text = ""
+        self.last_answer_selection = ""
+        self.answer_selection = ""
+        self.request_selection = ""
         for item in self.history.search(limit=200):
             if item.get("Action") != "note" and item.get("Result"):
                 self.last_answer_text = item["Result"]
+                self.last_answer_selection = item.get("Selection", "")
                 break
         self.worker: ChatWorker | None = None
         self.toolbar = Toolbar()
@@ -47,7 +51,7 @@ class ApplicationController:
         self.toolbar.action_requested.connect(self.run_action)
         self.toolbar.last_answer_requested.connect(self.show_last_answer)
         self.toolbar.exclude_requested.connect(self.exclude_current)
-        self.answer.stop_button.clicked.connect(self.cancel_request)
+        self.answer.followup_requested.connect(self.run_followup)
         self.bridge = ChangeBridge()
         self.bridge.changed.connect(self.reload_settings)
         self.management = ManagementServer(self.store, self.bridge.changed.emit, self.history)
@@ -121,12 +125,24 @@ class ApplicationController:
             question = dialog.input.text().strip()
             if not question:
                 return
+        self._start_request(action, question, self.selection_text)
+
+    def run_followup(self, question: str) -> None:
+        if not self.answer_selection or not self.answer_text:
+            self.answer.set_error("当前没有可继续追问的回答。")
+            return
+        self._start_request("followup", question, self.answer_selection, self.answer_text)
+
+    def _start_request(self, action: str, question: str, selection: str,
+                       answer_context: str = "") -> None:
         self.cancel_request()
+        self.request_selection = selection
         self.toolbar.hide()
         self.answer_text = ""
         self.answer.reset()
+        self.answer.set_followup_allowed(action in {"explain", "explain_detailed", "followup"})
         self.answer.show_near(QPoint(self.anchor.x(), self.anchor.y() + self.toolbar.height() + 8))
-        worker = ChatWorker(self.store, action, self.selection_text, question)
+        worker = ChatWorker(self.store, action, selection, question, answer_context)
         self.worker = worker
         worker.chunk.connect(self.append_chunk)
         worker.completed.connect(lambda value: self.finish_action(action, question, value)
@@ -143,6 +159,9 @@ class ApplicationController:
         self.cancel_request()
         self.toolbar.hide()
         self.answer.reset()
+        self.answer.set_followup_allowed(True)
+        self.answer_text = self.last_answer_text
+        self.answer_selection = self.last_answer_selection
         self.answer.set_answer(self.last_answer_text, complete=True)
         self.answer.show_near(self.anchor)
 
@@ -153,8 +172,10 @@ class ApplicationController:
     def finish_action(self, action: str, question: str, value: str) -> None:
         self.answer_text = value
         self.last_answer_text = value
+        self.last_answer_selection = self.request_selection
+        self.answer_selection = self.request_selection
         self.answer.set_answer(value, complete=True)
-        self.history.add(self.selection_text, action, question, self.selection_app, self.selection_title, value)
+        self.history.add(self.request_selection, action, question, self.selection_app, self.selection_title, value)
 
     def cancel_request(self) -> None:
         worker = self.worker
