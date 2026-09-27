@@ -68,7 +68,8 @@ class ChatWorker(QThread):
                 if text:
                     answer.append(text)
                     self.chunk.emit(text)
-            self.completed.emit("".join(answer))
+            if not self.isInterruptionRequested():
+                self.completed.emit("".join(answer))
         except urllib.error.HTTPError as error:
             details = error.read(2048).decode("utf-8", errors="replace")
             self.failed.emit(f"接口返回 HTTP {error.code}：{details}")

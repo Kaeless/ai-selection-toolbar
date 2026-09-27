@@ -24,7 +24,10 @@ DEFAULTS: dict[str, Any] = {
     "CustomActions": [],
     "ToolbarStyle": "standard",
     "ToolbarAccentColor": "#4F46E5",
+    "ToolbarBackgroundColor": "#18202E",
+    "ToolbarBorderColor": "#0B1020",
     "AnswerBackgroundColor": "#F8FAFC",
+    "AnswerBorderColor": "#0B1020",
     "ApiProfiles": [],
     "ActiveApiId": "",
 }

@@ -24,7 +24,7 @@ msbuild src\Desktop\AiSelectionToolbar.Desktop.csproj /t:Restore,Build /p:Config
 
 ## 打包与安装
 
-CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含 `AISelectionToolbar-0.5.0-win-x64-setup.exe` 安装程序和便携压缩包。Windows 本机也可运行 `ISCC.exe installer\AiSelectionToolbar.iss`，将安装程序生成到 `dist`。安装版可直接运行，无需手动解压；便携版仍需解压后运行 `AiSelectionToolbar.Desktop.exe`。
+CI 在 `windows-2022` 构建后上传 `windows-x64-packages` 工件，包含 `AISelectionToolbar-0.5.1-win-x64-setup.exe` 安装程序和便携压缩包。Windows 本机也可运行 `ISCC.exe installer\AiSelectionToolbar.iss`，将安装程序生成到 `dist`。安装版可直接运行，无需手动解压；便携版仍需解压后运行 `AiSelectionToolbar.Desktop.exe`。
 
 两种版本都要求目标计算机已安装 .NET Framework 4.8 或更高版本；安装程序会在安装前检查，便携版需用户自行确认。安装程序按当前用户安装到 `%LOCALAPPDATA%\Programs\AiSelectionToolbar`。登录启动可以在设置中开启，默认关闭；移动便携版后重新运行，会更新已启用的启动项路径。笔记默认在用户“文档”中的 `AiSelectionToolbar\Notes`，设置中可指定绝对目录。
 

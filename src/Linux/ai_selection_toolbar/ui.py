@@ -43,6 +43,7 @@ def popup_position(anchor: QPoint, size: QSize, available: QRect, gap: int = 10)
 
 class Toolbar(QWidget):
     action_requested = Signal(str)
+    last_answer_requested = Signal()
     exclude_requested = Signal()
 
     def __init__(self) -> None:
@@ -52,6 +53,8 @@ class Toolbar(QWidget):
         self.layout.setContentsMargins(8, 7, 8, 7)
         self.layout.setSpacing(4)
         self._accent = QColor("#4F46E5")
+        self._background = QColor("#18202E")
+        self._border = QColor("#0B1020")
         self._compact = False
 
     def rebuild(self, settings: dict) -> None:
@@ -60,7 +63,7 @@ class Toolbar(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         actions = [("了解", "explain"), ("详细解释", "explain_detailed"),
-                   ("翻译", "translate"), ("提问", "ask")]
+                   ("翻译", "translate"), ("提问", "ask"), ("上次解答", "last_answer")]
         actions.extend((item.get("Name", "操作"), "custom:" + item.get("Id", ""))
                        for item in settings.get("CustomActions", []) if item.get("Id"))
         compact = settings.get("ToolbarStyle") == "compact"
@@ -69,6 +72,9 @@ class Toolbar(QWidget):
                                        5 if compact else 8, 4 if compact else 7)
         self.layout.setSpacing(0 if compact else 4)
         self._accent = _accent(settings.get("ToolbarAccentColor", "#4F46E5"), "#4F46E5")
+        self._background = _accent(settings.get("ToolbarBackgroundColor", "#18202E"), "#18202E")
+        self._border = _accent(settings.get("ToolbarBorderColor", "#0B1020"), "#0B1020")
+        text_color = "#172033" if self._background.lightness() > 150 else "#F5F7FB"
         icon_path = (Path(getattr(sys, "_MEIPASS")) / "AppIcon.svg"
                      if getattr(sys, "frozen", False)
                      else Path(__file__).resolve().parents[2] / "Desktop" / "Assets" / "AppIcon.svg")
@@ -83,7 +89,8 @@ class Toolbar(QWidget):
             button.setProperty("action", True)
             button.setProperty("compactDivider", compact and index > 0)
             button.setCursor(Qt.PointingHandCursor)
-            button.clicked.connect(lambda _checked=False, value=action: self.action_requested.emit(value))
+            button.clicked.connect(lambda _checked=False, value=action: self.last_answer_requested.emit()
+                                   if value == "last_answer" else self.action_requested.emit(value))
             button.setContentsMargins(0, 0, 0, 0)
             self.layout.addWidget(button)
         exclude = QPushButton("⊘")
@@ -93,7 +100,7 @@ class Toolbar(QWidget):
         self.layout.addWidget(exclude)
         padding = "7px 12px" if compact else "8px 12px"
         self.setStyleSheet(f"""
-            QPushButton {{ color: {'#1d1d1f' if compact else '#f5f7fb'}; background: transparent; border: 0; border-radius: {'0' if compact else '9px'};
+            QPushButton {{ color: {text_color}; background: transparent; border: 0; border-radius: {'0' if compact else '9px'};
                           padding: {padding}; font-size: 13px; }}
             QPushButton[compactDivider="true"] {{ border-left: 1px solid {'#d7dbe3' if compact else 'transparent'}; }}
             QPushButton:hover {{ background: {_light(self._accent, 185) if compact else '#2d374a'}; color: {'#172033' if compact else 'white'}; }}
@@ -107,16 +114,11 @@ class Toolbar(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         rect = self.rect().adjusted(1, 1, -1, -1)
         gradient = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        if self._compact:
-            gradient.setColorAt(0, QColor("#ffffff"))
-            gradient.setColorAt(0.55, QColor("#f7f8fb"))
-            gradient.setColorAt(1, self._accent.lighter(185))
-        else:
-            gradient.setColorAt(0, QColor("#18202e"))
-            gradient.setColorAt(0.55, QColor("#101622"))
-            gradient.setColorAt(1, self._accent.darker(125))
+        gradient.setColorAt(0, self._background)
+        gradient.setColorAt(0.55, self._background.darker(105 if not self._compact else 100))
+        gradient.setColorAt(1, self._background.lighter(115 if self._compact else 105))
         painter.setBrush(gradient)
-        painter.setPen(QPen(self._accent.darker(110), 1))
+        painter.setPen(QPen(self._border, 1))
         painter.drawRoundedRect(rect, 13 if self._compact else 15, 13 if self._compact else 15)
         super().paintEvent(event)
 
@@ -137,6 +139,13 @@ class AnswerWindow(QWidget):
         self.setAttribute(Qt.WA_OpaquePaintEvent, True)
         self._accent = QColor("#0071E3")
         self._background = QColor("#F8FAFC")
+        self._border = QColor("#0B1020")
+        self._pending_markdown = ""
+        self._pending_complete = False
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.timeout.connect(self._render_pending_answer)
+        self._fitting = False
         self._pinned = False
         self._drag_offset = None
         self.setWindowTitle("AI 回答")
@@ -159,6 +168,8 @@ class AnswerWindow(QWidget):
         header.addWidget(self.pin_button)
         self.viewer = QTextBrowser()
         self.viewer.setOpenExternalLinks(True)
+        self.viewer.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.viewer.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         text_option = QTextOption()
         text_option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
         self.viewer.document().setDefaultTextOption(text_option)
@@ -185,24 +196,24 @@ class AnswerWindow(QWidget):
         self._apply_style()
         self.update()
 
+    def set_border(self, value: str) -> None:
+        self._border = _accent(value, "#0B1020")
+        self._apply_style()
+        self.update()
+
     def _apply_style(self) -> None:
         accent = self._accent.name()
         self.setStyleSheet(f"""
             QLabel#heading {{ color: #172033; font-size: 18px; font-weight: 650; padding: 2px 2px 0; }}
             QPushButton#pinButton {{ min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; padding: 0;
                                     border-radius: 16px; font-size: 16px; }}
-            QTextBrowser {{ background: {self._background.name()}; color: #243149; border: 1px solid #d6deea;
+            QTextBrowser {{ background: {self._background.name()}; color: #243149; border: 1px solid {self._border.name()};
                            border-radius: 16px; padding: 16px; font-size: 14px; selection-background-color: {_light(self._accent, 180)}; }}
-            QPushButton {{ background: #ffffff; color: #35445d; border: 1px solid #d6deea;
+            QPushButton {{ background: #ffffff; color: #35445d; border: 1px solid {self._border.name()};
                           border-radius: 999px; padding: 9px 17px; }}
             QPushButton:hover {{ background: {_light(self._accent, 185)}; color: {accent}; }}
             QPushButton:pressed {{ background: {self._accent.name()}; color: white; }}
             QPushButton:checked {{ background: {self._accent.name()}; color: white; border-color: {self._accent.darker(110).name()}; }}
-            QScrollBar:vertical {{ width: 11px; margin: 12px 5px 12px 0; background: #eef1f6; }}
-            QScrollBar::handle:vertical {{ min-height: 34px; border-radius: 5px; background: {_accent(self._accent.name()).lighter(135).name()}; }}
-            QScrollBar::handle:vertical:hover {{ background: {self._accent.name()}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
         """)
 
     @property
@@ -233,38 +244,61 @@ class AnswerWindow(QWidget):
         gradient.setColorAt(0.7, self._background.lighter(104))
         gradient.setColorAt(1, self._background.lighter(112))
         painter.setBrush(gradient)
-        painter.setPen(QPen(self._accent.darker(110), 1))
+        painter.setPen(QPen(self._border, 1))
         painter.drawRoundedRect(rect, 22, 22)
         super().paintEvent(event)
 
     def reset(self) -> None:
+        self._render_timer.stop()
+        self._pending_markdown = ""
+        self._pending_complete = False
         self.heading.setText("正在生成回答…")
         self.viewer.clear()
 
     def set_answer(self, markdown: str, complete: bool = False) -> None:
-        self.viewer.setMarkdown(markdown)
-        self._fit_to_answer()
-        QTimer.singleShot(0, self._fit_to_answer)
+        self._pending_markdown = markdown
+        self._pending_complete = self._pending_complete or complete
         if complete:
+            self._render_timer.stop()
+            self._render_pending_answer()
+        elif not self._render_timer.isActive():
+            self._render_timer.start(50)
+
+    def _render_pending_answer(self) -> None:
+        self.viewer.setMarkdown(self._pending_markdown)
+        self._fit_to_answer()
+        if self._pending_complete:
             self.heading.setText("回答完成")
+            self._pending_complete = False
 
     def _fit_to_answer(self) -> None:
-        """Grow with streamed content, then let the viewer scroll long answers."""
-        document = self.viewer.document()
-        viewport_width = self.viewer.viewport().width()
-        if viewport_width <= 0:
-            viewport_width = self.width() - 54
-        document.setDocumentMargin(0)
-        document.setTextWidth(max(320, viewport_width - 12))
-        document.adjustSize()
-        content_height = math.ceil(document.size().height())
-        target_height = max(220, min(720, content_height + 82))
-        if target_height != self.height():
-            self.resize(self.width(), target_height)
+        """Grow with streamed content up to the current screen's usable height."""
+        if self._fitting:
+            return
+        self._fitting = True
+        try:
+            document = self.viewer.document()
+            viewport_width = self.viewer.viewport().width()
+            if viewport_width <= 0:
+                viewport_width = self.width() - 54
+            document.setDocumentMargin(0)
+            document.setTextWidth(max(320, viewport_width - 12))
+            document.adjustSize()
+            content_height = math.ceil(document.size().height())
+            screen = QGuiApplication.screenAt(self.pos()) or QGuiApplication.primaryScreen()
+            max_height = max(220, screen.availableGeometry().height() - 48)
+            # Keep short Markdown blocks, especially fenced code, inside the
+            # viewport even though the scrollbar itself is intentionally hidden.
+            target_height = max(240, min(max_height, content_height + 82))
+            if abs(target_height - self.height()) > 1:
+                self.resize(self.width(), target_height)
+        finally:
+            self._fitting = False
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
-        QTimer.singleShot(0, self._fit_to_answer)
+        if self.viewer.toPlainText():
+            self.viewer.document().setTextWidth(max(320, self.viewer.viewport().width() - 12))
 
     def set_error(self, message: str) -> None:
         self.heading.setText("请求失败")
@@ -302,10 +336,15 @@ class QuestionDialog(QDialog):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("针对选中文字提问")
-        self.setMinimumWidth(420)
+        self.setFixedWidth(460)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("输入你的问题"))
+        layout.setContentsMargins(16, 14, 16, 12)
+        layout.setSpacing(8)
+        label = QLabel("输入你的问题")
+        label.setObjectName("questionLabel")
+        layout.addWidget(label)
         self.input = QLineEdit()
+        self.input.setMinimumHeight(36)
         self.input.setPlaceholderText("例如：这段代码为什么这样写？")
         layout.addWidget(self.input)
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)

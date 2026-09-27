@@ -29,6 +29,7 @@ namespace AiSelectionToolbar.Desktop
         private string _sourceApplication = "演示";
         private string _selectedText = "";
         private string _lastExplanation;
+        private string _lastAnswer;
         private string _sourceTitle = "";
         private Rectangle _selectionBounds;
         private double _compactWidth = 520;
@@ -107,10 +108,18 @@ namespace AiSelectionToolbar.Desktop
         {
             var settings = GetSettings();
             System.Windows.Media.Color accent;
+            System.Windows.Media.Color toolbarBackground;
+            System.Windows.Media.Color toolbarBorder;
             try { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarAccentColor ?? "#4F46E5"); }
             catch { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4F46E5"); }
+            try { toolbarBackground = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarBackgroundColor ?? "#18202E"); }
+            catch { toolbarBackground = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#18202E"); }
+            try { toolbarBorder = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarBorderColor ?? "#0B1020"); }
+            catch { toolbarBorder = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0B1020"); }
             var brush = new SolidColorBrush(accent);
             AccentBadge.Background = brush;
+            QuickPanel.Background = new SolidColorBrush(toolbarBackground);
+            QuickPanel.BorderBrush = new SolidColorBrush(toolbarBorder);
             QuickCustomActions.Children.Clear();
             if (settings.CustomActions != null)
             {
@@ -138,8 +147,6 @@ namespace AiSelectionToolbar.Desktop
             _compactWidth = Math.Min(requiredWidth, Math.Max(160, maxWidth));
             var overflow = requiredWidth > _compactWidth;
             _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
-            QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
-                new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
         }
 
         private void ApplyAnswerAppearance()
@@ -151,6 +158,8 @@ namespace AiSelectionToolbar.Desktop
             var brush = new SolidColorBrush(background);
             ExpandedPanel.Background = brush;
             ResultView.Background = brush;
+            try { ExpandedPanel.BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.AnswerBorderColor ?? "#0B1020")); }
+            catch { ExpandedPanel.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(11, 16, 32)); }
         }
 
         private Button CreateCustomButton(CustomActionDefinition custom)
@@ -301,6 +310,11 @@ namespace AiSelectionToolbar.Desktop
         private async void Action_Click(object sender, RoutedEventArgs e)
         {
             var action = ((Button)sender).Tag as string;
+            if (action == "last_answer")
+            {
+                ShowLastAnswer();
+                return;
+            }
             var selection = _selectedText.Trim();
             if (selection.Length == 0)
             {
@@ -350,7 +364,10 @@ namespace AiSelectionToolbar.Desktop
                         NoteButton.IsEnabled = !string.IsNullOrWhiteSpace(_lastExplanation);
                     }
                     if (hasAnswer)
+                    {
+                        _lastAnswer = _rawResult.ToString();
                         AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, prompt);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -387,6 +404,35 @@ namespace AiSelectionToolbar.Desktop
             if (_rawResult.Length == 0) _rawResult.Append("已停止。");
             RenderResult();
             StatusLabel.Text = "已停止";
+        }
+
+        private void ShowLastAnswer()
+        {
+            if (string.IsNullOrWhiteSpace(_lastAnswer))
+            {
+                var recent = LoadHistoryItems != null ? LoadHistoryItems("", 0) : _history.ToArray();
+                var item = recent.FirstOrDefault(entry => entry != null &&
+                    !string.Equals(entry.Action, "note", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(entry.Result));
+                if (item != null) _lastAnswer = item.Result;
+            }
+            if (string.IsNullOrWhiteSpace(_lastAnswer))
+            {
+                ShowExpanded();
+                _rawResult.Clear();
+                _rawResult.Append("还没有可显示的上一次解答。");
+                RenderResult();
+                return;
+            }
+            CancelGeneration();
+            _rawResult.Clear();
+            _rawResult.Append(_lastAnswer);
+            _receivedReasoning = false;
+            ShowExpanded();
+            NoteButton.IsEnabled = false;
+            StopButton.IsEnabled = false;
+            StatusLabel.Text = "上一次解答";
+            RenderResult();
         }
 
         private void Copy_Click(object sender, RoutedEventArgs e)
@@ -719,7 +765,8 @@ namespace AiSelectionToolbar.Desktop
                     ApiProfiles = new List<ApiProfileSummary>(external.ApiProfiles ?? new List<ApiProfileSummary>()),
                     CustomActions = new List<CustomActionDefinition>(external.CustomActions ?? new List<CustomActionDefinition>()),
                     ToolbarStyle = external.ToolbarStyle, ToolbarAccentColor = external.ToolbarAccentColor,
-                    AnswerBackgroundColor = external.AnswerBackgroundColor,
+                    ToolbarBackgroundColor = external.ToolbarBackgroundColor, ToolbarBorderColor = external.ToolbarBorderColor,
+                    AnswerBackgroundColor = external.AnswerBackgroundColor, AnswerBorderColor = external.AnswerBorderColor,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
             }
             lock (_stateLock) return new DesktopSettings { AutoShow = _settings.AutoShow,
@@ -730,7 +777,8 @@ namespace AiSelectionToolbar.Desktop
                 ApiProfiles = new List<ApiProfileSummary>(_settings.ApiProfiles ?? new List<ApiProfileSummary>()),
                 CustomActions = new List<CustomActionDefinition>(_settings.CustomActions ?? new List<CustomActionDefinition>()),
                 ToolbarStyle = _settings.ToolbarStyle, ToolbarAccentColor = _settings.ToolbarAccentColor,
-                AnswerBackgroundColor = _settings.AnswerBackgroundColor,
+                ToolbarBackgroundColor = _settings.ToolbarBackgroundColor, ToolbarBorderColor = _settings.ToolbarBorderColor,
+                AnswerBackgroundColor = _settings.AnswerBackgroundColor, AnswerBorderColor = _settings.AnswerBorderColor,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };
         }
 
@@ -744,7 +792,10 @@ namespace AiSelectionToolbar.Desktop
             current.CustomActions = value.CustomActions ?? new List<CustomActionDefinition>();
             current.ToolbarStyle = value.ToolbarStyle;
             current.ToolbarAccentColor = value.ToolbarAccentColor;
+            current.ToolbarBackgroundColor = value.ToolbarBackgroundColor;
+            current.ToolbarBorderColor = value.ToolbarBorderColor;
             current.AnswerBackgroundColor = value.AnswerBackgroundColor;
+            current.AnswerBorderColor = value.AnswerBorderColor;
             PersistSettings(current);
         }
 

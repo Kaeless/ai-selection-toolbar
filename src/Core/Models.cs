@@ -20,6 +20,10 @@ namespace AiSelectionToolbar.Core
         [DataMember(Order = 10)] public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
         [DataMember(Order = 11)] public string ToolbarStyle { get; set; } = "standard";
         [DataMember(Order = 12)] public string ToolbarAccentColor { get; set; } = "#4F46E5";
+        [DataMember(Order = 15)] public string ToolbarBackgroundColor { get; set; } = "#18202E";
+        [DataMember(Order = 16)] public string ToolbarBorderColor { get; set; } = "#0B1020";
+        [DataMember(Order = 17)] public string AnswerBackgroundColor { get; set; } = "#F8FAFC";
+        [DataMember(Order = 18)] public string AnswerBorderColor { get; set; } = "#0B1020";
         [DataMember(Order = 13)] public List<ApiProfile> ApiProfiles { get; set; } = new List<ApiProfile>();
         [DataMember(Order = 14)] public string ActiveApiId { get; set; }
 
@@ -82,6 +86,10 @@ namespace AiSelectionToolbar.Core
             CustomActions = new List<CustomActionDefinition>();
             ToolbarStyle = "standard";
             ToolbarAccentColor = "#4F46E5";
+            ToolbarBackgroundColor = "#18202E";
+            ToolbarBorderColor = "#0B1020";
+            AnswerBackgroundColor = "#F8FAFC";
+            AnswerBorderColor = "#0B1020";
             ApiProfiles = new List<ApiProfile>();
         }
     }

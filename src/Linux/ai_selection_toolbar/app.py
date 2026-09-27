@@ -32,13 +32,20 @@ class ApplicationController:
         self.selection_app = ""
         self.selection_title = ""
         self.answer_text = ""
+        self.last_answer_text = ""
+        for item in self.history.search(limit=200):
+            if item.get("Action") != "note" and item.get("Result"):
+                self.last_answer_text = item["Result"]
+                break
         self.worker: ChatWorker | None = None
         self.toolbar = Toolbar()
         self.answer = AnswerWindow()
         self.toolbar.rebuild(self.settings)
         self.answer.set_accent(self.settings.get("ToolbarAccentColor", "#4F46E5"))
         self.answer.set_background(self.settings.get("AnswerBackgroundColor", "#F8FAFC"))
+        self.answer.set_border(self.settings.get("AnswerBorderColor", "#0B1020"))
         self.toolbar.action_requested.connect(self.run_action)
+        self.toolbar.last_answer_requested.connect(self.show_last_answer)
         self.toolbar.exclude_requested.connect(self.exclude_current)
         self.answer.stop_button.clicked.connect(self.cancel_request)
         self.bridge = ChangeBridge()
@@ -122,10 +129,22 @@ class ApplicationController:
         worker = ChatWorker(self.store, action, self.selection_text, question)
         self.worker = worker
         worker.chunk.connect(self.append_chunk)
-        worker.completed.connect(lambda value: self.finish_action(action, question, value))
+        worker.completed.connect(lambda value: self.finish_action(action, question, value)
+                                 if self.worker is worker else None)
         worker.failed.connect(self.answer.set_error)
         worker.finished.connect(lambda: setattr(self, "worker", None) if self.worker is worker else None)
         worker.start()
+
+    def show_last_answer(self) -> None:
+        if not self.last_answer_text:
+            self.answer.set_error("还没有可显示的上一次解答。")
+            self.answer.show_near(self.anchor)
+            return
+        self.cancel_request()
+        self.toolbar.hide()
+        self.answer.reset()
+        self.answer.set_answer(self.last_answer_text, complete=True)
+        self.answer.show_near(self.anchor)
 
     def append_chunk(self, chunk: str) -> None:
         self.answer_text += chunk
@@ -133,14 +152,26 @@ class ApplicationController:
 
     def finish_action(self, action: str, question: str, value: str) -> None:
         self.answer_text = value
+        self.last_answer_text = value
         self.answer.set_answer(value, complete=True)
         self.history.add(self.selection_text, action, question, self.selection_app, self.selection_title, value)
 
     def cancel_request(self) -> None:
-        if self.worker is not None:
-            self.worker.cancel()
-            self.worker.wait(1500)
-            self.worker = None
+        worker = self.worker
+        if worker is None:
+            return
+        self.worker = None
+        # Disconnect queued UI updates before cancelling. A response that is
+        # already buffered must not render into a newly opened answer window.
+        for signal, slot in ((worker.chunk, self.append_chunk),
+                             (worker.failed, self.answer.set_error)):
+            try:
+                signal.disconnect(slot)
+            except (TypeError, RuntimeError):
+                pass
+        worker.finished.connect(worker.deleteLater)
+        worker.cancel()
+        worker.wait(1500)
 
     def exclude_current(self) -> None:
         if not self.selection_app:
@@ -159,6 +190,7 @@ class ApplicationController:
         self.toolbar.rebuild(self.settings)
         self.answer.set_accent(self.settings.get("ToolbarAccentColor", "#4F46E5"))
         self.answer.set_background(self.settings.get("AnswerBackgroundColor", "#F8FAFC"))
+        self.answer.set_border(self.settings.get("AnswerBorderColor", "#0B1020"))
         self.watcher.update_excluded(self.settings.get("ExcludedApplications", []))
         self._apply_autostart()
 

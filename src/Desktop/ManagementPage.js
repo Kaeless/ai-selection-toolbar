@@ -59,6 +59,8 @@ function updatePreview() {
   document.documentElement.style.setProperty("--toolbar-accent", color);
   const answerColor = byId("answerColor").value.toUpperCase();
   byId("answerColorValue").textContent = answerColor;
+  for (const id of ["toolbarBackgroundColor", "toolbarBorderColor", "answerBorderColor"])
+    byId(id + "Value").textContent = byId(id).value.toUpperCase();
   const preview = byId("toolbarPreview");
   preview.classList.toggle("compact", byId("toolbarStyle").value === "compact");
   while (preview.children.length > 5) preview.lastElementChild.remove();
@@ -176,7 +178,10 @@ async function loadSettings() {
   editApi(apiProfiles.find(x => x.Id === editingId) || apiProfiles.find(x => x.Id === activeApiId) || null);
   byId("toolbarStyle").value = value.ToolbarStyle === "compact" ? "compact" : "standard";
   byId("toolbarColor").value = /^#[0-9a-f]{6}$/i.test(value.ToolbarAccentColor || "") ? value.ToolbarAccentColor : "#4F46E5";
+  byId("toolbarBackgroundColor").value = /^#[0-9a-f]{6}$/i.test(value.ToolbarBackgroundColor || "") ? value.ToolbarBackgroundColor : "#18202E";
+  byId("toolbarBorderColor").value = /^#[0-9a-f]{6}$/i.test(value.ToolbarBorderColor || "") ? value.ToolbarBorderColor : "#0B1020";
   byId("answerColor").value = /^#[0-9a-f]{6}$/i.test(value.AnswerBackgroundColor || "") ? value.AnswerBackgroundColor : "#F8FAFC";
+  byId("answerBorderColor").value = /^#[0-9a-f]{6}$/i.test(value.AnswerBorderColor || "") ? value.AnswerBorderColor : "#0B1020";
   customActions = (value.CustomActions || []).map(x => ({Id: x.Id || "", Name: x.Name || "", Prompt: x.Prompt || ""}));
   renderCustomActions(); renderExclusions(value.ExcludedApplications || []);
 }
@@ -188,7 +193,10 @@ async function saveSettings() {
     AutoShow: byId("autoShow").checked, StartOnLogin: byId("startOnLogin").checked,
     TargetLanguage: byId("language").value.trim(), NotesDirectory: byId("notesDirectory").value.trim(),
     ToolbarStyle: byId("toolbarStyle").value, ToolbarAccentColor: byId("toolbarColor").value.toUpperCase(),
+    ToolbarBackgroundColor: byId("toolbarBackgroundColor").value.toUpperCase(),
+    ToolbarBorderColor: byId("toolbarBorderColor").value.toUpperCase(),
     AnswerBackgroundColor: byId("answerColor").value.toUpperCase(),
+    AnswerBorderColor: byId("answerBorderColor").value.toUpperCase(),
     CustomActions: customActions.map(x => ({Id: x.Id, Name: x.Name.trim(), Prompt: x.Prompt.trim()}))
   });
   await loadSettings(); // Retrieve generated IDs for new buttons.
@@ -259,7 +267,10 @@ byId("saveSettings").addEventListener("click", () => run(saveSettings));
 byId("saveToolbar").addEventListener("click", () => run(saveSettings));
 byId("toolbarStyle").addEventListener("change", updatePreview);
 byId("toolbarColor").addEventListener("input", updatePreview);
+byId("toolbarBackgroundColor").addEventListener("input", updatePreview);
+byId("toolbarBorderColor").addEventListener("input", updatePreview);
 byId("answerColor").addEventListener("input", updatePreview);
+byId("answerBorderColor").addEventListener("input", updatePreview);
 byId("addCustomAction").addEventListener("click", () => {
   if (customActions.length >= 8) return;
   customActions.push({Id: "", Name: "", Prompt: ""}); renderCustomActions();

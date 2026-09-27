@@ -37,6 +37,7 @@
       <Button Content="详细解释" Tag="explain_detailed" Click="Action_Click"/>
       <Button Content="翻译" Tag="translate" Click="Action_Click"/>
       <Button Content="提问" Tag="ask" Click="Action_Click"/>
+      <Button Content="上次解答" Tag="last_answer" Click="Action_Click" ToolTip="显示上一次完成的回答"/>
       <StackPanel x:Name="QuickCustomActions" Orientation="Horizontal"/>
       <Border Width="1" Background="#DDE4EE" Margin="6,8,10,8"/>
       <Button Content="⊘" Click="ExcludeCurrent_Click" ToolTip="在此程序隐藏" Padding="9,5" FontSize="17"/>
@@ -58,7 +59,7 @@
       </StackPanel>
       <Border Grid.Row="1" Background="#F7F9FC" CornerRadius="12" Margin="0,10,0,0" Padding="6">
         <RichTextBox x:Name="ResultView" IsReadOnly="True" IsDocumentEnabled="True" BorderThickness="0"
-                     VerticalScrollBarVisibility="Auto" Background="Transparent" FontSize="14"
+                     VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Hidden" Background="Transparent" FontSize="14"
                      Foreground="#253348" SelectionBrush="#B9C7FF">
           <FlowDocument PagePadding="6" ColumnWidth="1000"><Paragraph>正在准备回答…</Paragraph></FlowDocument>
         </RichTextBox>

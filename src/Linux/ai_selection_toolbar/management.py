@@ -108,9 +108,19 @@ class ManagementServer:
 
             def _save_general(self, payload: dict[str, Any]) -> None:
                 settings = owner.store.load()
-                answer_color = str(payload.get("AnswerBackgroundColor", "#F8FAFC")).upper()
-                if not re.fullmatch(r"#[0-9A-F]{6}", answer_color):
-                    raise ValueError("回答框颜色应为 #RRGGBB")
+                colors = {
+                    key: str(payload.get(key, fallback)).upper()
+                    for key, fallback in {
+                        "ToolbarAccentColor": "#4F46E5",
+                        "ToolbarBackgroundColor": "#18202E",
+                        "ToolbarBorderColor": "#0B1020",
+                        "AnswerBackgroundColor": "#F8FAFC",
+                        "AnswerBorderColor": "#0B1020",
+                    }.items()
+                }
+                for key, color in colors.items():
+                    if not re.fullmatch(r"#[0-9A-F]{6}", color):
+                        raise ValueError(f"{key} 应为 #RRGGBB")
                 language = str(payload.get("TargetLanguage") or "").strip()
                 if not language or len(language) > 50:
                     raise ValueError("翻译目标语言无效")
@@ -123,8 +133,7 @@ class ManagementServer:
                     "TranslationTargetLanguage": language,
                     "NotesDirectory": notes,
                     "ToolbarStyle": payload.get("ToolbarStyle", "standard"),
-                    "ToolbarAccentColor": payload.get("ToolbarAccentColor", "#4F46E5"),
-                    "AnswerBackgroundColor": answer_color,
+                    **colors,
                     "CustomActions": payload.get("CustomActions") or [],
                 })
                 owner.store.save(settings)

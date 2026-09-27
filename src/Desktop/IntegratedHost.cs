@@ -148,7 +148,7 @@ namespace AiSelectionToolbar.Desktop
         private DesktopSettings GetDesktopSettings()
         {
             lock (gate) return new DesktopSettings {
-                Version = "0.5.0", Author = "Kaeless",
+                Version = "0.5.1", Author = "Kaeless",
                 AutoShow = settings.AutoShow, TargetLanguage = settings.TranslationTargetLanguage,
                 StartOnLogin = settings.StartOnLogin && StartupRegistration.IsEnabledForCurrentExecutable(),
                 NotesDirectory = MarkdownNoteStore.ResolveDirectory(settings.NotesDirectory),
@@ -159,7 +159,10 @@ namespace AiSelectionToolbar.Desktop
                 CustomActions = CopyActions(settings.CustomActions),
                 ToolbarStyle = settings.ToolbarStyle ?? "standard",
                 ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5",
-                AnswerBackgroundColor = settings.AnswerBackgroundColor ?? "#F8FAFC"
+                ToolbarBackgroundColor = settings.ToolbarBackgroundColor ?? "#18202E",
+                ToolbarBorderColor = settings.ToolbarBorderColor ?? "#0B1020",
+                AnswerBackgroundColor = settings.AnswerBackgroundColor ?? "#F8FAFC",
+                AnswerBorderColor = settings.AnswerBorderColor ?? "#0B1020"
             };
         }
 
@@ -177,6 +180,10 @@ namespace AiSelectionToolbar.Desktop
                 if (value.AnswerBackgroundColor == null ||
                     !Regex.IsMatch(value.AnswerBackgroundColor, @"^#[0-9a-fA-F]{6}$"))
                     throw new ArgumentException("回答框颜色应为 #RRGGBB。", nameof(value));
+                if (value.ToolbarBackgroundColor == null || !Regex.IsMatch(value.ToolbarBackgroundColor, @"^#[0-9a-fA-F]{6}$") ||
+                    value.ToolbarBorderColor == null || !Regex.IsMatch(value.ToolbarBorderColor, @"^#[0-9a-fA-F]{6}$") ||
+                    value.AnswerBorderColor == null || !Regex.IsMatch(value.AnswerBorderColor, @"^#[0-9a-fA-F]{6}$"))
+                    throw new ArgumentException("边框或背景颜色应为 #RRGGBB。", nameof(value));
                 var updated = Clone(settings);
                 updated.AutoShow = value.AutoShow;
                 updated.StartOnLogin = value.StartOnLogin;
@@ -186,7 +193,10 @@ namespace AiSelectionToolbar.Desktop
                 updated.CustomActions = customActions;
                 updated.ToolbarStyle = value.ToolbarStyle;
                 updated.ToolbarAccentColor = value.ToolbarAccentColor.ToUpperInvariant();
+                updated.ToolbarBackgroundColor = value.ToolbarBackgroundColor.ToUpperInvariant();
+                updated.ToolbarBorderColor = value.ToolbarBorderColor.ToUpperInvariant();
                 updated.AnswerBackgroundColor = value.AnswerBackgroundColor.ToUpperInvariant();
+                updated.AnswerBorderColor = value.AnswerBorderColor.ToUpperInvariant();
                 StartupRegistration.SetEnabled(updated.StartOnLogin);
                 try { settingsStore.Save(updated); }
                 catch
@@ -304,7 +314,8 @@ namespace AiSelectionToolbar.Desktop
             NotesDirectory = source.NotesDirectory,
             CustomActions = CopyActions(source.CustomActions),
             ToolbarStyle = source.ToolbarStyle, ToolbarAccentColor = source.ToolbarAccentColor,
-            AnswerBackgroundColor = source.AnswerBackgroundColor,
+            ToolbarBackgroundColor = source.ToolbarBackgroundColor, ToolbarBorderColor = source.ToolbarBorderColor,
+            AnswerBackgroundColor = source.AnswerBackgroundColor, AnswerBorderColor = source.AnswerBorderColor,
             ActiveApiId = source.ActiveApiId,
             ApiProfiles = CopyApiProfiles(source.ApiProfiles)
         };

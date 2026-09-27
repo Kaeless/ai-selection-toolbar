@@ -1,18 +1,56 @@
+# Python environments and generated files
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build and release artifacts
+build/
+dist/
+*.spec
+*.run
+*.tar.gz
+*.zip
+*.msi
+*.exe
+*.dmg
+*.AppImage
+
+# .NET and installer outputs
 **/bin/
 **/obj/
-*.user
-*.suo
-.vs/
 packages/
 TestResults/
+*.user
+*.suo
+*.pdb
+
+# Local databases, history, notes and runtime state
 *.db
 *.sqlite
 *.sqlite3
 notes/
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-build/
-dist/
-*.spec
+.local/
+
+# IDE and editor state
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local Codex/agent state and reports
+.codex/
+.agents/
+
+# Keep local CI workflow definitions out of this source-only upload
+.github/workflows/
+
+# OS files
+.DS_Store
+Thumbs.db
