@@ -29,13 +29,16 @@ namespace AiSelectionToolbar.Desktop
         private string _sourceApplication = "演示";
         private string _selectedText = "";
         private string _lastExplanation;
+        private string _lastAnswer;
+        private string _answerSelection;
+        private bool _pinned;
         private string _sourceTitle = "";
         private Rectangle _selectionBounds;
         private double _compactWidth = 520;
         private double _compactHeight = 62;
         private readonly StringBuilder _rawResult = new StringBuilder();
         private bool _receivedReasoning;
-        private readonly DispatcherTimer _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(140) };
+        private readonly DispatcherTimer _renderTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         private readonly DispatcherTimer _dismissTimer = new DispatcherTimer {
             Interval = TimeSpan.FromSeconds(8)
         };
@@ -49,6 +52,8 @@ namespace AiSelectionToolbar.Desktop
         public Func<DesktopSettings> LoadSettings { get; set; }
         public Action<DesktopSettings> SaveSettings { get; set; }
         public Action<ApiConnectionInput> SaveApiConnection { get; set; }
+        public Action<string> SelectApiConnection { get; set; }
+        public Action<string> DeleteApiConnection { get; set; }
         public Action<string, string, string, string> SaveNote { get; set; }
         public Func<string, string, bool> IsDuplicateNote { get; set; }
 
@@ -72,6 +77,7 @@ namespace AiSelectionToolbar.Desktop
             ResizeMode = ResizeMode.NoResize;
             QuickPanel.Visibility = Visibility.Collapsed;
             ExpandedPanel.Visibility = Visibility.Visible;
+            ApplyAnswerAppearance();
             Topmost = true;
             if (IsVisible)
             {
@@ -97,6 +103,7 @@ namespace AiSelectionToolbar.Desktop
             Height = _compactHeight;
             ExpandedPanel.Visibility = Visibility.Collapsed;
             QuickPanel.Visibility = Visibility.Visible;
+            FollowupPanel.Visibility = Visibility.Collapsed;
             Topmost = true;
         }
 
@@ -104,10 +111,18 @@ namespace AiSelectionToolbar.Desktop
         {
             var settings = GetSettings();
             System.Windows.Media.Color accent;
+            System.Windows.Media.Color toolbarBackground;
+            System.Windows.Media.Color toolbarBorder;
             try { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarAccentColor ?? "#4F46E5"); }
             catch { accent = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#4F46E5"); }
+            try { toolbarBackground = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarBackgroundColor ?? "#18202E"); }
+            catch { toolbarBackground = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#18202E"); }
+            try { toolbarBorder = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.ToolbarBorderColor ?? "#0B1020"); }
+            catch { toolbarBorder = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#0B1020"); }
             var brush = new SolidColorBrush(accent);
             AccentBadge.Background = brush;
+            QuickPanel.Background = new SolidColorBrush(toolbarBackground);
+            QuickPanel.BorderBrush = new SolidColorBrush(toolbarBorder);
             QuickCustomActions.Children.Clear();
             if (settings.CustomActions != null)
             {
@@ -135,8 +150,19 @@ namespace AiSelectionToolbar.Desktop
             _compactWidth = Math.Min(requiredWidth, Math.Max(160, maxWidth));
             var overflow = requiredWidth > _compactWidth;
             _compactHeight = compact ? (overflow ? 70 : 52) : (overflow ? 78 : 62);
-            QuickPanel.BorderBrush = compact ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(224, 231, 241)) :
-                new SolidColorBrush(System.Windows.Media.Color.FromRgb(212, 222, 238));
+        }
+
+        private void ApplyAnswerAppearance()
+        {
+            var settings = GetSettings();
+            System.Windows.Media.Color background;
+            try { background = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.AnswerBackgroundColor ?? "#F8FAFC"); }
+            catch { background = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F8FAFC"); }
+            var brush = new SolidColorBrush(background);
+            ExpandedPanel.Background = brush;
+            ResultView.Background = brush;
+            try { ExpandedPanel.BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(settings.AnswerBorderColor ?? "#0B1020")); }
+            catch { ExpandedPanel.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(11, 16, 32)); }
         }
 
         private Button CreateCustomButton(CustomActionDefinition custom)
@@ -180,6 +206,7 @@ namespace AiSelectionToolbar.Desktop
                 string.Equals(NormalizeApplicationName(x), processName, StringComparison.OrdinalIgnoreCase))) return;
             // Clicking a button can leave the source app foreground with its old selection.
             // A second mouse-up must not replace an open answer or cancel its stream.
+            if (_pinned && ExpandedPanel.Visibility == Visibility.Visible) return;
             if (IsVisible && ExpandedPanel.Visibility == Visibility.Visible &&
                 string.Equals(_selectedText, text, StringComparison.Ordinal) &&
                 string.Equals(_sourceApplication, sourceApplication, StringComparison.OrdinalIgnoreCase)) return;
@@ -189,6 +216,8 @@ namespace AiSelectionToolbar.Desktop
             _sourceApplication = sourceApplication;
             _selectedText = text;
             _lastExplanation = null;
+            _answerSelection = null;
+            FollowupPanel.Visibility = Visibility.Collapsed;
             NoteButton.IsEnabled = false;
             _sourceTitle = sourceTitle ?? "";
             _rawResult.Clear();
@@ -224,6 +253,8 @@ namespace AiSelectionToolbar.Desktop
             Top = Math.Max(0, SystemParameters.WorkArea.Bottom - Height - 24);
             _server = new LocalManagementServer(GetSettings, UpdateSettings, GetHistory,
                 AddExclusion, RemoveExclusion, UpdateApiConnection,
+                id => { if (SelectApiConnection != null) SelectApiConnection(id); },
+                id => { if (DeleteApiConnection != null) DeleteApiConnection(id); },
                 id => { if (DeleteHistoryItem != null) DeleteHistoryItem(id); },
                 () => { if (ClearHistoryItems != null) ClearHistoryItems(); });
             try { _server.Start(); }
@@ -250,6 +281,13 @@ namespace AiSelectionToolbar.Desktop
             _renderTimer.Stop();
             CancelGeneration();
             Hide();
+        }
+
+        private void Pin_Click(object sender, RoutedEventArgs e)
+        {
+            _pinned = !_pinned;
+            PinButton.Content = _pinned ? "📍" : "📌";
+            PinButton.ToolTip = _pinned ? "取消固定回答窗口" : "固定回答窗口";
         }
 
         private void ExcludeCurrent_Click(object sender, RoutedEventArgs e)
@@ -285,7 +323,14 @@ namespace AiSelectionToolbar.Desktop
         private async void Action_Click(object sender, RoutedEventArgs e)
         {
             var action = ((Button)sender).Tag as string;
-            var selection = _selectedText.Trim();
+            if (action == "last_answer")
+            {
+                ShowLastAnswer();
+                return;
+            }
+            var followup = action == "followup";
+            var allowFollowup = followup || action == "explain" || action == "explain_detailed";
+            var selection = ((followup ? _answerSelection : _selectedText) ?? "").Trim();
             if (selection.Length == 0)
             {
                 ShowExpanded();
@@ -293,12 +338,24 @@ namespace AiSelectionToolbar.Desktop
                 return;
             }
             string prompt = "";
-            if (action == "ask")
+            string historyPrompt = "";
+            if (followup)
+            {
+                var entered = FollowupInput.Text.Trim();
+                if (entered.Length == 0) return;
+                historyPrompt = entered;
+                prompt = "已有回答：\n" + (_lastAnswer ?? _rawResult.ToString()) +
+                    "\n\n追问：\n" + entered;
+                action = "ask";
+                FollowupInput.Clear();
+            }
+            else if (action == "ask")
             {
                 var entered = EditText("输入问题", "请针对选中文字提问：", "");
                 if (entered == null) return;
                 prompt = entered.Trim();
                 if (prompt.Length == 0) { MessageBox.Show(this, "问题不能为空。", "提问"); return; }
+                historyPrompt = prompt;
             }
             CancelGeneration();
             _rawResult.Clear();
@@ -307,7 +364,7 @@ namespace AiSelectionToolbar.Desktop
             var cancellation = new CancellationTokenSource();
             _generation = cancellation;
             NoteButton.IsEnabled = false;
-            StopButton.IsEnabled = true;
+            FollowupPanel.Visibility = Visibility.Collapsed;
             RenderResult();
             StatusLabel.Text = "生成中…";
             var progress = new UiProgress(Dispatcher, chunk =>
@@ -334,7 +391,12 @@ namespace AiSelectionToolbar.Desktop
                         NoteButton.IsEnabled = !string.IsNullOrWhiteSpace(_lastExplanation);
                     }
                     if (hasAnswer)
-                        AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, prompt);
+                    {
+                        _lastAnswer = _rawResult.ToString();
+                        _answerSelection = selection;
+                        FollowupPanel.Visibility = allowFollowup ? Visibility.Visible : Visibility.Collapsed;
+                        AddHistory(action, selection, _rawResult.ToString(), _sourceApplication, historyPrompt);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -358,19 +420,48 @@ namespace AiSelectionToolbar.Desktop
             }
             finally
             {
-                if (_generation == cancellation) { _generation = null; StopButton.IsEnabled = false; }
+                if (_generation == cancellation) _generation = null;
                 if (_generation == null) { _renderTimer.Stop(); RenderResult(); }
                 cancellation.Dispose();
             }
         }
 
-        private void Stop_Click(object sender, RoutedEventArgs e)
+        private void Followup_Click(object sender, RoutedEventArgs e)
         {
+            Action_Click(sender, e);
+        }
+
+        private void ShowLastAnswer()
+        {
+            if (string.IsNullOrWhiteSpace(_lastAnswer))
+            {
+                var recent = LoadHistoryItems != null ? LoadHistoryItems("", 0) : _history.ToArray();
+                var item = recent.FirstOrDefault(entry => entry != null &&
+                    !string.Equals(entry.Action, "note", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(entry.Result));
+                if (item != null)
+                {
+                    _lastAnswer = item.Result;
+                    _answerSelection = item.Selection;
+                }
+            }
+            if (string.IsNullOrWhiteSpace(_lastAnswer))
+            {
+                ShowExpanded();
+                _rawResult.Clear();
+                _rawResult.Append("还没有可显示的上一次解答。");
+                RenderResult();
+                return;
+            }
             CancelGeneration();
-            _renderTimer.Stop();
-            if (_rawResult.Length == 0) _rawResult.Append("已停止。");
+            _rawResult.Clear();
+            _rawResult.Append(_lastAnswer);
+            _receivedReasoning = false;
+            ShowExpanded();
+            NoteButton.IsEnabled = false;
+            StatusLabel.Text = "上一次解答";
+            FollowupPanel.Visibility = Visibility.Visible;
             RenderResult();
-            StatusLabel.Text = "已停止";
         }
 
         private void Copy_Click(object sender, RoutedEventArgs e)
@@ -387,7 +478,6 @@ namespace AiSelectionToolbar.Desktop
         {
             var active = _generation;
             _generation = null;
-            StopButton.IsEnabled = false;
             if (active != null) active.Cancel();
         }
 
@@ -527,7 +617,7 @@ namespace AiSelectionToolbar.Desktop
                 ? transform.Value.Transform(new System.Windows.Point(area.Right, area.Bottom))
                 : new System.Windows.Point(SystemParameters.WorkArea.Right, SystemParameters.WorkArea.Bottom);
             var maxWidth = Math.Max(360, bottomRight.X - topLeft.X - 24);
-            var maxHeight = Math.Max(150, bottomRight.Y - topLeft.Y - 24);
+            var maxHeight = Math.Max(360, (bottomRight.Y - topLeft.Y) * 0.70);
             var lines = (markdown.Length == 0 ? "正在生成…" : markdown)
                 .Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             var typeface = new Typeface(new System.Windows.Media.FontFamily("Segoe UI"),
@@ -541,7 +631,7 @@ namespace AiSelectionToolbar.Desktop
                     FlowDirection.LeftToRight, typeface, 14, System.Windows.Media.Brushes.Black, pixelsPerDip);
                 longest = Math.Max(longest, measured.WidthIncludingTrailingWhitespace);
             }
-            var targetWidth = Math.Min(maxWidth, Math.Max(380, Math.Min(650, longest + 100)));
+            var targetWidth = Math.Min(maxWidth * 0.82, Math.Max(380, longest + 100));
             Width = targetWidth;
 
             var contentWidth = Math.Max(220, targetWidth - 95);
@@ -664,7 +754,7 @@ namespace AiSelectionToolbar.Desktop
             public void Report(string value)
             {
                 if (dispatcher.CheckAccess()) update(value);
-                else dispatcher.Invoke(new Action(() => update(value)));
+                else dispatcher.BeginInvoke(new Action(() => update(value)), DispatcherPriority.Background);
             }
         }
 
@@ -699,16 +789,24 @@ namespace AiSelectionToolbar.Desktop
                     AutoShow = external.AutoShow, TargetLanguage = external.TargetLanguage,
                     StartOnLogin = external.StartOnLogin, NotesDirectory = external.NotesDirectory,
                     ApiBaseUrl = external.ApiBaseUrl, Model = external.Model,
+                    ActiveApiId = external.ActiveApiId,
+                    ApiProfiles = new List<ApiProfileSummary>(external.ApiProfiles ?? new List<ApiProfileSummary>()),
                     CustomActions = new List<CustomActionDefinition>(external.CustomActions ?? new List<CustomActionDefinition>()),
                     ToolbarStyle = external.ToolbarStyle, ToolbarAccentColor = external.ToolbarAccentColor,
+                    ToolbarBackgroundColor = external.ToolbarBackgroundColor, ToolbarBorderColor = external.ToolbarBorderColor,
+                    AnswerBackgroundColor = external.AnswerBackgroundColor, AnswerBorderColor = external.AnswerBorderColor,
                     ExcludedApplications = new List<string>(external.ExcludedApplications ?? new List<string>()) };
             }
             lock (_stateLock) return new DesktopSettings { AutoShow = _settings.AutoShow,
                 TargetLanguage = _settings.TargetLanguage,
                 StartOnLogin = _settings.StartOnLogin, NotesDirectory = _settings.NotesDirectory,
                 ApiBaseUrl = _settings.ApiBaseUrl, Model = _settings.Model,
+                ActiveApiId = _settings.ActiveApiId,
+                ApiProfiles = new List<ApiProfileSummary>(_settings.ApiProfiles ?? new List<ApiProfileSummary>()),
                 CustomActions = new List<CustomActionDefinition>(_settings.CustomActions ?? new List<CustomActionDefinition>()),
                 ToolbarStyle = _settings.ToolbarStyle, ToolbarAccentColor = _settings.ToolbarAccentColor,
+                ToolbarBackgroundColor = _settings.ToolbarBackgroundColor, ToolbarBorderColor = _settings.ToolbarBorderColor,
+                AnswerBackgroundColor = _settings.AnswerBackgroundColor, AnswerBorderColor = _settings.AnswerBorderColor,
                 ExcludedApplications = new List<string>(_settings.ExcludedApplications) };
         }
 
@@ -722,6 +820,10 @@ namespace AiSelectionToolbar.Desktop
             current.CustomActions = value.CustomActions ?? new List<CustomActionDefinition>();
             current.ToolbarStyle = value.ToolbarStyle;
             current.ToolbarAccentColor = value.ToolbarAccentColor;
+            current.ToolbarBackgroundColor = value.ToolbarBackgroundColor;
+            current.ToolbarBorderColor = value.ToolbarBorderColor;
+            current.AnswerBackgroundColor = value.AnswerBackgroundColor;
+            current.AnswerBorderColor = value.AnswerBorderColor;
             PersistSettings(current);
         }
 

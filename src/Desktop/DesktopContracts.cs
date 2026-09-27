@@ -71,23 +71,43 @@ namespace AiSelectionToolbar.Desktop
 
     public sealed class DesktopSettings
     {
+        public string Version { get; set; } = "0.5.3";
+        public string Author { get; set; } = "Kaeless";
         public bool AutoShow { get; set; } = true;
         public bool StartOnLogin { get; set; }
         public string TargetLanguage { get; set; } = "中文";
         public string NotesDirectory { get; set; } = "";
         public string ApiBaseUrl { get; set; } = "";
         public string Model { get; set; } = "";
+        public string ActiveApiId { get; set; } = "";
+        public List<ApiProfileSummary> ApiProfiles { get; set; } = new List<ApiProfileSummary>();
         public List<string> ExcludedApplications { get; set; } = new List<string>();
         public List<CustomActionDefinition> CustomActions { get; set; } = new List<CustomActionDefinition>();
         public string ToolbarStyle { get; set; } = "standard";
         public string ToolbarAccentColor { get; set; } = "#4F46E5";
+        public string ToolbarBackgroundColor { get; set; } = "#18202E";
+        public string ToolbarBorderColor { get; set; } = "#0B1020";
+        public string AnswerBackgroundColor { get; set; } = "#F8FAFC";
+        public string AnswerBorderColor { get; set; } = "#0B1020";
     }
 
     public sealed class ApiConnectionInput
     {
+        public string Id { get; set; }
+        public string Name { get; set; }
         public string ApiBaseUrl { get; set; }
         public string Model { get; set; }
         public string ApiKey { get; set; }
+        public bool MakeActive { get; set; }
+    }
+
+    public sealed class ApiProfileSummary
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string ApiBaseUrl { get; set; }
+        public string Model { get; set; }
+        public bool HasApiKey { get; set; }
     }
 
     public sealed class HistoryItem

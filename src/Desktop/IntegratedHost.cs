@@ -25,6 +25,7 @@ namespace AiSelectionToolbar.Desktop
         public IntegratedHost()
         {
             settings = settingsStore.Load() ?? new AppSettings();
+            settings.EnsureApiProfiles();
             if (settings.StartOnLogin)
             {
                 try { StartupRegistration.SetEnabled(true); }
@@ -39,6 +40,8 @@ namespace AiSelectionToolbar.Desktop
             window.LoadSettings = GetDesktopSettings;
             window.SaveSettings = SaveDesktopSettings;
             window.SaveApiConnection = SaveConnection;
+            window.SelectApiConnection = SelectConnection;
+            window.DeleteApiConnection = DeleteConnection;
             window.SaveHistoryItem = SaveHistory;
             window.LoadHistoryItems = (term, offset) =>
                 history.Search(term, 50, offset).Select(ToDesktopHistory).ToArray();
@@ -145,14 +148,21 @@ namespace AiSelectionToolbar.Desktop
         private DesktopSettings GetDesktopSettings()
         {
             lock (gate) return new DesktopSettings {
+                Version = "0.5.3", Author = "Kaeless",
                 AutoShow = settings.AutoShow, TargetLanguage = settings.TranslationTargetLanguage,
                 StartOnLogin = settings.StartOnLogin && StartupRegistration.IsEnabledForCurrentExecutable(),
                 NotesDirectory = MarkdownNoteStore.ResolveDirectory(settings.NotesDirectory),
                 ApiBaseUrl = settings.BaseUrl, Model = settings.Model,
+                ActiveApiId = settings.ActiveApiId,
+                ApiProfiles = CopyApiSummaries(settings.ApiProfiles),
                 ExcludedApplications = new List<string>(settings.ExcludedApplications ?? new List<string>()),
                 CustomActions = CopyActions(settings.CustomActions),
                 ToolbarStyle = settings.ToolbarStyle ?? "standard",
-                ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5"
+                ToolbarAccentColor = settings.ToolbarAccentColor ?? "#4F46E5",
+                ToolbarBackgroundColor = settings.ToolbarBackgroundColor ?? "#18202E",
+                ToolbarBorderColor = settings.ToolbarBorderColor ?? "#0B1020",
+                AnswerBackgroundColor = settings.AnswerBackgroundColor ?? "#F8FAFC",
+                AnswerBorderColor = settings.AnswerBorderColor ?? "#0B1020"
             };
         }
 
@@ -167,6 +177,13 @@ namespace AiSelectionToolbar.Desktop
                 if (value.ToolbarAccentColor == null ||
                     !Regex.IsMatch(value.ToolbarAccentColor, @"^#[0-9a-fA-F]{6}$"))
                     throw new ArgumentException("工具栏颜色应为 #RRGGBB。", nameof(value));
+                if (value.AnswerBackgroundColor == null ||
+                    !Regex.IsMatch(value.AnswerBackgroundColor, @"^#[0-9a-fA-F]{6}$"))
+                    throw new ArgumentException("回答框颜色应为 #RRGGBB。", nameof(value));
+                if (value.ToolbarBackgroundColor == null || !Regex.IsMatch(value.ToolbarBackgroundColor, @"^#[0-9a-fA-F]{6}$") ||
+                    value.ToolbarBorderColor == null || !Regex.IsMatch(value.ToolbarBorderColor, @"^#[0-9a-fA-F]{6}$") ||
+                    value.AnswerBorderColor == null || !Regex.IsMatch(value.AnswerBorderColor, @"^#[0-9a-fA-F]{6}$"))
+                    throw new ArgumentException("边框或背景颜色应为 #RRGGBB。", nameof(value));
                 var updated = Clone(settings);
                 updated.AutoShow = value.AutoShow;
                 updated.StartOnLogin = value.StartOnLogin;
@@ -176,6 +193,10 @@ namespace AiSelectionToolbar.Desktop
                 updated.CustomActions = customActions;
                 updated.ToolbarStyle = value.ToolbarStyle;
                 updated.ToolbarAccentColor = value.ToolbarAccentColor.ToUpperInvariant();
+                updated.ToolbarBackgroundColor = value.ToolbarBackgroundColor.ToUpperInvariant();
+                updated.ToolbarBorderColor = value.ToolbarBorderColor.ToUpperInvariant();
+                updated.AnswerBackgroundColor = value.AnswerBackgroundColor.ToUpperInvariant();
+                updated.AnswerBorderColor = value.AnswerBorderColor.ToUpperInvariant();
                 StartupRegistration.SetEnabled(updated.StartOnLogin);
                 try { settingsStore.Save(updated); }
                 catch
@@ -192,17 +213,58 @@ namespace AiSelectionToolbar.Desktop
         {
             lock (gate)
             {
+                settings.EnsureApiProfiles();
+                var id = string.IsNullOrWhiteSpace(input.Id) ? Guid.NewGuid().ToString("N") : input.Id.Trim();
+                Guid parsed;
+                if (id != "legacy" && !Guid.TryParseExact(id, "N", out parsed))
+                    throw new ArgumentException("API 标识无效。", nameof(input));
+                var profile = settings.ApiProfiles.FirstOrDefault(item => item.Id == id);
+                if (profile == null)
+                {
+                    profile = new ApiProfile { Id = id };
+                    settings.ApiProfiles.Add(profile);
+                }
                 var endpointChanged = !string.Equals(
-                    (settings.BaseUrl ?? "").TrimEnd('/'),
+                    (profile.BaseUrl ?? "").TrimEnd('/'),
                     (input.ApiBaseUrl ?? "").TrimEnd('/'),
                     StringComparison.Ordinal);
-                // A blank key only preserves the previous secret for the same endpoint.
-                // Never send a cloud provider's key to a newly configured service.
                 if (endpointChanged && string.IsNullOrEmpty(input.ApiKey))
-                    settingsStore.SetApiKey(settings, null);
-                settings.BaseUrl = input.ApiBaseUrl;
-                settings.Model = input.Model;
-                if (!string.IsNullOrEmpty(input.ApiKey)) settingsStore.SetApiKey(settings, input.ApiKey);
+                    profile.ProtectedApiKey = null;
+                profile.Name = input.Name.Trim();
+                profile.BaseUrl = input.ApiBaseUrl.TrimEnd('/');
+                profile.Model = input.Model.Trim();
+                if (input.MakeActive || string.IsNullOrWhiteSpace(settings.ActiveApiId)) settings.ActiveApiId = id;
+                settings.EnsureApiProfiles();
+                if (!string.IsNullOrEmpty(input.ApiKey)) settingsStore.SetApiKey(profile, input.ApiKey);
+                settings.EnsureApiProfiles();
+                settingsStore.Save(settings);
+            }
+        }
+
+        private void SelectConnection(string id)
+        {
+            lock (gate)
+            {
+                settings.EnsureApiProfiles();
+                if (!settings.ApiProfiles.Any(profile => profile.Id == id))
+                    throw new ArgumentException("API 配置不存在。", nameof(id));
+                settings.ActiveApiId = id;
+                settings.EnsureApiProfiles();
+                settingsStore.Save(settings);
+            }
+        }
+
+        private void DeleteConnection(string id)
+        {
+            lock (gate)
+            {
+                settings.EnsureApiProfiles();
+                if (settings.ApiProfiles.Count <= 1)
+                    throw new ArgumentException("至少保留一个 API 配置。先新增另一个配置再删除。", nameof(id));
+                if (settings.ApiProfiles.RemoveAll(profile => profile.Id == id) == 0)
+                    throw new ArgumentException("API 配置不存在。", nameof(id));
+                if (settings.ActiveApiId == id) settings.ActiveApiId = settings.ApiProfiles[0].Id;
+                settings.EnsureApiProfiles();
                 settingsStore.Save(settings);
             }
         }
@@ -251,8 +313,24 @@ namespace AiSelectionToolbar.Desktop
             AutoShow = source.AutoShow, StartOnLogin = source.StartOnLogin,
             NotesDirectory = source.NotesDirectory,
             CustomActions = CopyActions(source.CustomActions),
-            ToolbarStyle = source.ToolbarStyle, ToolbarAccentColor = source.ToolbarAccentColor
+            ToolbarStyle = source.ToolbarStyle, ToolbarAccentColor = source.ToolbarAccentColor,
+            ToolbarBackgroundColor = source.ToolbarBackgroundColor, ToolbarBorderColor = source.ToolbarBorderColor,
+            AnswerBackgroundColor = source.AnswerBackgroundColor, AnswerBorderColor = source.AnswerBorderColor,
+            ActiveApiId = source.ActiveApiId,
+            ApiProfiles = CopyApiProfiles(source.ApiProfiles)
         };
+
+        private static List<ApiProfile> CopyApiProfiles(IEnumerable<ApiProfile> profiles) =>
+            (profiles ?? Enumerable.Empty<ApiProfile>()).Where(profile => profile != null)
+                .Select(profile => new ApiProfile { Id = profile.Id, Name = profile.Name,
+                    BaseUrl = profile.BaseUrl, Model = profile.Model,
+                    ProtectedApiKey = profile.ProtectedApiKey }).ToList();
+
+        private static List<ApiProfileSummary> CopyApiSummaries(IEnumerable<ApiProfile> profiles) =>
+            (profiles ?? Enumerable.Empty<ApiProfile>()).Where(profile => profile != null)
+                .Select(profile => new ApiProfileSummary { Id = profile.Id, Name = profile.Name,
+                    ApiBaseUrl = profile.BaseUrl, Model = profile.Model,
+                    HasApiKey = !string.IsNullOrWhiteSpace(profile.ProtectedApiKey) }).ToList();
 
         private static List<CustomActionDefinition> CopyActions(IEnumerable<CustomActionDefinition> actions) =>
             (actions ?? Enumerable.Empty<CustomActionDefinition>())
