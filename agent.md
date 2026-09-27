@@ -29,7 +29,7 @@ Windows 继续使用现有 C# 实现；Linux 使用 Python/PySide6 和 X11。配
 - Linux 历史记录兼容旧版 C# SQLite 表结构，管理页索引位于左侧且不再显示分页按钮。
 - Linux 发布包包含 `AiSelectionToolbar.Linux`、`install.sh`、`uninstall.sh` 和 `AppIcon.svg`。
 - Linux CI 还会生成无需解压、可直接运行的 `AISelectionToolbar-linux-x64.run` 安装包；Windows CI 生成 Inno Setup 安装 EXE。
-- 管理页面从后端动态显示当前版本和作者；当前版本为 `0.5.1`，作者为 `Kaeless`。
+- 管理页面从后端动态显示当前版本和作者；当前 Linux 版本为 `0.5.2`，作者为 `Kaeless`。
 
 ## 重要目录
 
@@ -59,7 +59,7 @@ ai-selection-toolbar
 发布包安装：
 
 ```bash
-tar -xzf AISelectionToolbar-linux-x64-v0.5.1.tar.gz
+tar -xzf AISelectionToolbar-linux-x64-v0.5.2.tar.gz
 cd AISelectionToolbar-linux-x64
 ./install.sh
 ```
@@ -82,9 +82,9 @@ PyInstaller 构建入口参考 `.github/workflows/linux-build.yml`。构建时�
 
 ## 最新发布
 
-- 版本：`v0.5.1`
-- 发布页：`https://github.com/Kaeless/ai-selection-toolbar/releases/tag/v0.5.1`
-- Linux 下载：`https://github.com/Kaeless/ai-selection-toolbar/releases/download/v0.5.1/AISelectionToolbar-linux-x64-v0.5.1.run`
+- 版本：`v0.5.2`
+- 发布页：`https://github.com/Kaeless/ai-selection-toolbar/releases/tag/v0.5.2`
+- Linux 下载：`https://github.com/Kaeless/ai-selection-toolbar/releases/download/v0.5.2/AISelectionToolbar-linux-x64-v0.5.2.run`
 - SHA256：`35b6de9e7fe8a80f6ae40b374004aaebea6e8e9ebc4d007e8452584845890a94`
 
 ## 后续修改约定
