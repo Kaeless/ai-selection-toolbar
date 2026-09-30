@@ -78,54 +78,6 @@ function renderIndexMarkdown(value) {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>");
 }
-function renderInlineMarkdown(value) {
-  const code = [];
-  let html = escapeHtml(value).replace(/`([^`]+)`/g, (_, content) => {
-    code.push("<code>" + content + "</code>");
-    return "\u0000" + (code.length - 1) + "\u0000";
-  });
-  html = html
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
-    .replace(/\*([^*]+)\*/g, "<em>$1</em>")
-    .replace(/_([^_]+)_/g, "<em>$1</em>");
-  return html.replace(/\u0000(\d+)\u0000/g, (_, index) => code[Number(index)]);
-}
-function renderMarkdown(value) {
-  const lines = String(value || "").replace(/\r\n?/g, "\n").split("\n");
-  const output = [];
-  let code = null;
-  let listType = null;
-  const closeList = () => {
-    if (listType) output.push("</" + listType + ">");
-    listType = null;
-  };
-  for (const line of lines) {
-    const fence = line.match(/^\s*```(?:[^\s]*)\s*$/);
-    if (fence) {
-      if (code === null) { closeList(); code = []; }
-      else { output.push("<pre><code>" + escapeHtml(code.join("\n")) + "</code></pre>"); code = null; }
-      continue;
-    }
-    if (code !== null) { code.push(line); continue; }
-    if (!line.trim()) { closeList(); continue; }
-    const heading = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
-    if (heading) { closeList(); const level = heading[1].length; output.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`); continue; }
-    const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
-    const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
-    if (unordered || ordered) {
-      const nextType = ordered ? "ol" : "ul";
-      if (listType !== nextType) { closeList(); output.push("<" + nextType + ">"); listType = nextType; }
-      output.push("<li>" + renderInlineMarkdown((ordered || unordered)[1]) + "</li>");
-      continue;
-    }
-    closeList();
-    output.push("<p>" + renderInlineMarkdown(line) + "</p>");
-  }
-  if (code !== null) output.push("<pre><code>" + escapeHtml(code.join("\n")) + "</code></pre>");
-  closeList();
-  return output.join("") || "<p class=\"empty\">无回答内容</p>";
-}
 function parseHistoryDate(value) {
   if (typeof value === "number") return new Date(value);
   const text = String(value || "");
@@ -276,7 +228,7 @@ async function loadHistory() {
     }
     const configuredAction = (item.Action || "").startsWith("custom:")
       ? customActions.find(x => x.Id === item.Action.slice(7)) : null;
-    const actionLabels = {explain: "了解", explain_detailed: "详细解释", translate: "翻译", ask: "提问", followup: "追问"};
+    const actionLabels = {explain: "了解", explain_detailed: "详细解释", translate: "翻译", ask: "提问"};
     const actionName = (item.Action || "").startsWith("custom:")
       ? "自定义 · " + (configuredAction?.Name || "操作") : (actionLabels[item.Action] || item.Action || "操作");
     meta.textContent = (isNaN(date.getTime()) ? dateLabel : date.toLocaleString()) + "  ·  " + actionName + "  ·  " + (item.Application || "未知程序");
@@ -299,8 +251,7 @@ async function loadHistory() {
     const selection = document.createElement("div"); selection.className = "selection"; selection.textContent = item.Selection || "";
     card.append(meta, selection);
     if (item.Prompt) { const question = document.createElement("div"); question.className = "question"; question.textContent = "提问：" + item.Prompt; card.append(question); }
-    const result = document.createElement("div"); result.className = "result";
-    result.innerHTML = renderMarkdown(item.Result || item.Response || "");
+    const result = document.createElement("div"); result.className = "result"; result.textContent = item.Result || item.Response || "";
     const footer = document.createElement("div"); footer.className = "entry-footer";
     const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "删除记录";
     remove.addEventListener("click", () => run(async () => {
