@@ -69,7 +69,8 @@ jobs:
           New-Item -ItemType Directory -Path $out -Force | Out-Null
           $fw = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
           $wpf = Join-Path $fw 'WPF'
-          & "$fw/csc.exe" /nologo /target:exe /out:"$release/WindowsUiSmoke.exe" /reference:"$release/AiSelectionToolbar.Desktop.exe" /reference:"$wpf/PresentationFramework.dll" /reference:"$wpf/PresentationCore.dll" /reference:"$wpf/WindowsBase.dll" /reference:System.Xaml.dll /reference:System.Web.Extensions.dll tests/WindowsUiSmoke.cs
+          $source = (Resolve-Path 'tests/WindowsUiSmoke.cs').Path
+          & "$fw/csc.exe" /nologo /target:exe /out:"$release/WindowsUiSmoke.exe" /reference:"$release/AiSelectionToolbar.Desktop.exe" /reference:"$wpf/PresentationFramework.dll" /reference:"$wpf/PresentationCore.dll" /reference:"$wpf/WindowsBase.dll" /reference:System.Xaml.dll /reference:System.Web.Extensions.dll "$source"
           if ($LASTEXITCODE -ne 0) { throw 'UI harness compilation failed' }
           $desktop = Start-Process "$release/WindowsUiSmoke.exe" -ArgumentList "`"$out`"" -PassThru
           try {
