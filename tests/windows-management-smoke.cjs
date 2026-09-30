@@ -67,12 +67,18 @@ const results = [];
     assert.ok((await (await api('/api/settings')).json()).CustomActions.some(a => a.Name === '总结' && a.Id));
     await page.screenshot({path: path.join(output, 'management-custom-toolbar.png'), fullPage: true, animations: 'disabled'});
   });
-  await test('B05', 'History search, index, literal HTML safety and record deletion', async () => {
+  await test('B05', 'History Markdown, search, index, literal HTML safety and deletion', async () => {
     await page.locator('#historyTab').click();
     await page.waitForFunction(() => document.querySelector('#historyList').textContent.includes('TCP'));
     assert.ok(await page.locator('#historyIndex button').count());
     assert.equal(await page.evaluate(() => window.xss), undefined);
     assert.ok((await page.locator('#historyList').innerText()).includes('<script>'));
+    assert.ok((await page.locator('#historyList .result h1').allTextContents()).includes('标题'));
+    assert.equal(await page.locator('#historyList .result strong').last().innerText(), '测试内容');
+    assert.ok(await page.locator('#historyList .result ul').count());
+    assert.equal(await page.locator('#historyList .result ul').first().evaluate(el => getComputedStyle(el).listStyleType), 'disc');
+    assert.ok(await page.locator('#historyList .result pre code').count());
+    assert.equal(await page.locator('#historyList .result script').count(), 0);
     await page.locator('#historySearch').fill('no-matching-history-xyz');
     await page.waitForFunction(() => document.querySelector('#historyIndexCount').textContent === '');
     await page.locator('#historySearch').fill('TCP');
