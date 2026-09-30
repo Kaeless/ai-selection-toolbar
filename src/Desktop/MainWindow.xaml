@@ -63,11 +63,12 @@
           <FlowDocument PagePadding="6" ColumnWidth="1000"><Paragraph>正在准备回答…</Paragraph></FlowDocument>
         </RichTextBox>
       </Border>
-      <StackPanel x:Name="FollowupPanel" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed" Margin="0,10,0,0">
+      <Grid x:Name="FollowupPanel" Grid.Row="2" Visibility="Collapsed" Margin="0,10,0,0">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <TextBox x:Name="FollowupInput" MinHeight="38" VerticalContentAlignment="Center" Padding="14,0"
                  BorderThickness="1" ToolTip="基于当前回答继续提问" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Hidden"/>
-        <Button Content="追问" Tag="followup" Click="Followup_Click" Margin="8,0,0,0" Padding="18,7" ToolTip="基于当前回答继续提问"/>
-      </StackPanel>
+        <Button Grid.Column="1" Content="追问" Tag="followup" Click="Followup_Click" Margin="8,0,0,0" Padding="18,7" ToolTip="基于当前回答继续提问"/>
+      </Grid>
       <TextBlock x:Name="StatusLabel" Visibility="Collapsed" Text="就绪"/>
     </Grid>
   </Border>
