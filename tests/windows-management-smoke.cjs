@@ -76,6 +76,7 @@ const results = [];
     assert.ok((await page.locator('#historyList .result h1').allTextContents()).includes('标题'));
     assert.equal(await page.locator('#historyList .result strong').last().innerText(), '测试内容');
     assert.ok(await page.locator('#historyList .result ul').count());
+    assert.equal(await page.locator('#historyList .result ul').first().evaluate(el => getComputedStyle(el).listStyleType), 'disc');
     assert.ok(await page.locator('#historyList .result pre code').count());
     assert.equal(await page.locator('#historyList .result script').count(), 0);
     await page.locator('#historySearch').fill('no-matching-history-xyz');
