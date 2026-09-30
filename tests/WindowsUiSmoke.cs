@@ -114,11 +114,14 @@ internal static class WindowsUiSmoke
                     Control<TextBlock>(window, "StatusLabel").Text != "完成");
                 Screenshot(window, "desktop-streaming"); await Complete(window);
                 Check("D06", "Markdown answer and followup are displayed", Answer(window).Contains("window = ack") &&
-                    Control<StackPanel>(window, "FollowupPanel").Visibility == Visibility.Visible);
+                    Control<Grid>(window, "FollowupPanel").Visibility == Visibility.Visible);
                 Check("D07", "Answer fits current Windows work area", window.Width <= SystemParameters.WorkArea.Width &&
                     window.Height <= SystemParameters.WorkArea.Height);
+                window.UpdateLayout();
+                Check("D10", "Followup input has usable editing width", Control<TextBox>(window, "FollowupInput").ActualWidth >= 200);
                 Screenshot(window, "desktop-answer");
                 Control<TextBox>(window, "FollowupInput").Text = "为什么需要 ACK？";
+                Screenshot(window, "desktop-followup-input");
                 Click(window, "followup"); await Complete(window);
                 Check("D08", "Followup preserves selection and includes previous answer", model.Selection == "TCP 滑动窗口" &&
                     model.Prompt.Contains("已有回答") && model.Prompt.Contains("为什么需要 ACK"));
