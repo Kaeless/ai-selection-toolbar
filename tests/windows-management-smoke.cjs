@@ -21,7 +21,7 @@ const results = [];
     try { await run(); results.push({id, name, status: 'PASS'}); }
     catch (e) {
       results.push({id, name, status: 'FAIL', error: e.message});
-      await page.screenshot({path: path.join(output, id + '-failure.png'), fullPage: true});
+      await page.screenshot({path: path.join(output, id + '-failure.png'), fullPage: true, animations: 'disabled'});
     }
     fs.writeFileSync(path.join(output, 'browser-results.json'), JSON.stringify(results, null, 2));
   }
@@ -33,7 +33,9 @@ const results = [];
     for (const section of ['settings', 'toolbar', 'history', 'exclusions']) {
       await page.locator('#' + section + 'Tab').click();
       assert.equal(await page.locator('#' + section + 'Panel').isVisible(), true);
-      await page.screenshot({path: path.join(output, 'management-' + section + '.png'), fullPage: true});
+      if (section === 'history') await page.waitForFunction(() => document.querySelector('#historyIndexCount').textContent.includes('条'));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({path: path.join(output, 'management-' + section + '.png'), fullPage: true, animations: 'disabled'});
     }
   });
   await test('B02', 'Save settings through UI and verify backend persistence', async () => {
@@ -63,7 +65,7 @@ const results = [];
     await page.locator('#status').evaluate(e => e.textContent = '');
     await page.locator('#saveToolbar').click(); await status();
     assert.ok((await (await api('/api/settings')).json()).CustomActions.some(a => a.Name === '总结' && a.Id));
-    await page.screenshot({path: path.join(output, 'management-custom-toolbar.png'), fullPage: true});
+    await page.screenshot({path: path.join(output, 'management-custom-toolbar.png'), fullPage: true, animations: 'disabled'});
   });
   await test('B05', 'History search, index, literal HTML safety and record deletion', async () => {
     await page.locator('#historyTab').click();
@@ -98,7 +100,7 @@ const results = [];
   await test('B09', 'Responsive settings at 900px and no browser script errors', async () => {
     await page.setViewportSize({width: 900, height: 800}); await page.locator('#settingsTab').click();
     assert.equal(await page.locator('#settingsPanel').isVisible(), true); assert.deepEqual(errors, []);
-    await page.screenshot({path: path.join(output, 'management-900px.png'), fullPage: true});
+    await page.screenshot({path: path.join(output, 'management-900px.png'), fullPage: true, animations: 'disabled'});
   });
   await browser.close();
   if (results.some(r => r.status === 'FAIL')) process.exitCode = 1;
